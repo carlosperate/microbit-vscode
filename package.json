@@ -17,6 +17,7 @@
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.91.0",
     "esbuild": "^0.21.0",
+    "fake-indexeddb": "^6.2.5",
     "rimraf": "^5.0.5",
     "sirv-cli": "^2.0.2",
     "typescript": "^5.4.0",
