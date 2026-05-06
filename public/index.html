@@ -39,5 +39,25 @@
 	</script>
 	<script src="./vscode/out/vs/workbench/workbench.web.main.nls.js"></script>
 	<script src="./vscode/out/vs/workbench/workbench.web.main.js"></script>
-	<script src="./vscode/out/vs/code/browser/workbench/workbench.js"></script>
+	<script>
+		// Load product.json and rewrite extension URIs to absolute form
+		// (the workbench entry script prefers `window.product` over a fetch).
+		(async () => {
+			const product = await (await fetch('./product.json')).json();
+			const basePath = new URL('.', document.baseURI).pathname.replace(/\/$/, '');
+			const proto = location.protocol.replace(':', '');
+			if (Array.isArray(product.additionalBuiltinExtensions)) {
+				product.additionalBuiltinExtensions = product.additionalBuiltinExtensions.map((ext) => {
+					if ((ext.scheme === 'http' || ext.scheme === 'https') && !ext.authority) {
+						return { ...ext, scheme: proto, authority: location.host, path: basePath + ext.path };
+					}
+					return ext;
+				});
+			}
+			window.product = product;
+			const s = document.createElement('script');
+			s.src = './vscode/out/vs/code/browser/workbench/workbench.js';
+			document.head.appendChild(s);
+		})();
+	</script>
 </html>

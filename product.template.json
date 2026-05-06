@@ -1,0 +1,14 @@
+{
+	"productConfiguration": {
+		"nameShort": "micro:bit Web IDE",
+		"nameLong": "micro:bit Web IDE",
+		"applicationName": "microbit-web-ide",
+		"dataFolderName": ".microbit-web-ide",
+		"extensionsGallery": {
+			"serviceUrl": "https://open-vsx.org/vscode/gallery",
+			"itemUrl": "https://open-vsx.org/vscode/item",
+			"resourceUrlTemplate": "https://open-vsx.org/vscode/asset/{publisher}/{name}/{version}/Microsoft.VisualStudio.Code.WebResources/{path}"
+		}
+	},
+	"additionalBuiltinExtensions": []
+}
