@@ -1,0 +1,8 @@
+{
+	"name": "micro:bit Web IDE",
+	"short_name": "micro:bit",
+	"start_url": "./",
+	"display": "standalone",
+	"background_color": "#1e1e1e",
+	"theme_color": "#1e1e1e"
+}
