@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect } from 'vitest';
-import { IdbFS } from './idbfs.js';
-import { FileNotFound } from './memfs.js';
+import { IdbFS } from '../src/idbfs.js';
+import { FileNotFound } from '../src/memfs.js';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const dec = (b: Uint8Array) => new TextDecoder().decode(b);

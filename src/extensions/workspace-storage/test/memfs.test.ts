@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MemFS, FileNotFound, FileExists, FileIsADirectory } from './memfs.js';
+import { MemFS, FileNotFound, FileExists, FileIsADirectory } from '../src/memfs.js';
 
 const enc = (s: string) => new TextEncoder().encode(s);
 const dec = (b: Uint8Array) => new TextDecoder().decode(b);
