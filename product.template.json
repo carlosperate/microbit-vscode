@@ -10,5 +10,6 @@
 			"resourceUrlTemplate": "https://open-vsx.org/vscode/asset/{publisher}/{name}/{version}/Microsoft.VisualStudio.Code.WebResources/{path}"
 		}
 	},
+	"folderUri": { "scheme": "memfs", "path": "/welcome" },
 	"additionalBuiltinExtensions": []
 }

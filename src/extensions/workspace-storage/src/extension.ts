@@ -12,7 +12,60 @@ import {
 import { IdbFS } from './idbfs.js';
 import { LocalFS } from './localfs.js';
 
+// Injected at build time by `scripts/build-extension.mjs` via esbuild's
+// `define` option. Each entry is a path relative to `welcome/` plus its
+// UTF-8 contents. Empty array if `welcome/` is missing or empty.
+declare const __WELCOME_FILES__: ReadonlyArray<{ path: string; contents: string }>;
+
 type CoreFS = MemFS | IdbFS | LocalFS;
+
+const WELCOME_ROOT = '/welcome';
+const WELCOME_STARTER_PATH = 'main.py';
+const WELCOME_README_PATH = 'README.md';
+const WELCOME_SHOWN_KEY = 'microbit.welcomeShown';
+
+function seedWelcome(memfs: MemFS): void {
+	try {
+		memfs.createDirectory(WELCOME_ROOT);
+	} catch {
+		// Already exists (e.g. seeded by a previous activate in the same
+		// session). Safe to ignore — we still overwrite individual files below.
+	}
+	const encoder = new TextEncoder();
+	for (const file of __WELCOME_FILES__) {
+		const parts = file.path.split('/');
+		// Ensure every intermediate directory exists.
+		for (let i = 0; i < parts.length - 1; i++) {
+			const dirPath = `${WELCOME_ROOT}/${parts.slice(0, i + 1).join('/')}`;
+			try {
+				memfs.createDirectory(dirPath);
+			} catch {
+				/* already exists */
+			}
+		}
+		const filePath = `${WELCOME_ROOT}/${file.path}`;
+		memfs.writeFile(filePath, encoder.encode(file.contents), {
+			create: true,
+			overwrite: true,
+		});
+	}
+}
+
+async function showWelcomeTabs(context: vscode.ExtensionContext): Promise<void> {
+	if (context.globalState.get<boolean>(WELCOME_SHOWN_KEY)) return;
+	await context.globalState.update(WELCOME_SHOWN_KEY, true);
+	try {
+		const readmeUri = vscode.Uri.parse(`memfs:${WELCOME_ROOT}/${WELCOME_README_PATH}`);
+		await vscode.commands.executeCommand('markdown.showPreview', readmeUri);
+		const starterUri = vscode.Uri.parse(`memfs:${WELCOME_ROOT}/${WELCOME_STARTER_PATH}`);
+		await vscode.window.showTextDocument(starterUri, {
+			preview: false,
+			viewColumn: vscode.ViewColumn.Beside,
+		});
+	} catch (e: any) {
+		console.warn('[microbit.workspace-storage] welcome auto-open failed:', e?.message ?? e);
+	}
+}
 
 function toVscodeError(err: unknown, uri: vscode.Uri): vscode.FileSystemError {
 	if (err instanceof FileNotFound) return vscode.FileSystemError.FileNotFound(uri);
@@ -152,6 +205,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			isCaseSensitive: true,
 		})
 	);
+
+	// Seed the welcome workspace into memfs. The manifest is generated at build
+	// time by walking the repo-root `welcome/` directory (see
+	// `scripts/build-extension.mjs`); memfs is wiped on every reload so this
+	// rewrites the full tree on each activation. Cheap, ~kb of data.
+	seedWelcome(memfs);
+	void showWelcomeTabs(context);
 
 	// Restore a previously-picked local folder handle BEFORE activation
 	// resolves, so the workbench doesn't try to enumerate `localfs:/` against
