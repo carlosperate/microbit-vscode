@@ -1,5 +1,6 @@
 [
 	{ "publisher": "carlosperate", "name": "uf2editor" },
+	{ "publisher": "carlosperate", "name": "microbit-themes" },
 	{ "publisher": "ms-vscode", "name": "cpptools-themes" },
 	{ "publisher": "eclipse-cdt", "name": "serial-monitor" },
 	{ "publisher": "arm", "name": "device-manager" }

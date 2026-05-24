@@ -11,5 +11,8 @@
 		}
 	},
 	"folderUri": { "scheme": "memfs", "path": "/welcome" },
+	"configurationDefaults": {
+		"workbench.colorTheme": "micro:bit Pixel Light"
+	},
 	"additionalBuiltinExtensions": []
 }
