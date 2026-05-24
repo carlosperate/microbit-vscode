@@ -22,12 +22,19 @@ async function exists(p) {
 
 async function resolveVersion(publisher, name) {
 	const url = `https://open-vsx.org/api/${publisher}/${name}`;
-	const res = await fetch(url);
-	if (!res.ok) {
-		throw new Error(`Failed to fetch metadata for ${publisher}.${name}: ${res.status}`);
+	const delays = [0, 1000, 3000, 7000];
+	let lastStatus;
+	for (const delay of delays) {
+		if (delay) await new Promise((r) => setTimeout(r, delay));
+		const res = await fetch(url);
+		if (res.ok) {
+			const data = await res.json();
+			return data.version;
+		}
+		lastStatus = res.status;
+		if (res.status !== 429 && res.status < 500) break;
 	}
-	const data = await res.json();
-	return data.version;
+	throw new Error(`Failed to fetch metadata for ${publisher}.${name}: ${lastStatus}`);
 }
 
 async function downloadVsix(publisher, name, version, destPath) {
