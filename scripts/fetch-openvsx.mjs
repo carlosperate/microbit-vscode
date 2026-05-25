@@ -8,7 +8,7 @@ import semver from 'semver';
 import { unpackVsix } from './lib/vsix.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const configPath = path.join(root, 'scripts', 'extensions.config.json');
+const configPath = path.join(root, 'config', 'extensions.config.json');
 const cacheDir = path.join(root, '.cache', 'vsix');
 const distExtensions = path.join(root, 'dist', 'extensions');
 
@@ -105,7 +105,7 @@ function printUpdateCheck(results) {
 	console.log('');
 	if (outdated.length) {
 		console.log(
-			`${outdated.length} update(s) available. Bump "version" in scripts/extensions.config.json, then run npm run build.`
+			`${outdated.length} update(s) available. Bump "version" in config/extensions.config.json, then run npm run build.`
 		);
 	} else if (!errors.length) {
 		console.log('All pinned extensions are up to date.');

@@ -6,14 +6,17 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const srcDir = path.join(root, 'src', 'extensions', 'workspace-storage');
 const outDir = path.join(root, 'dist', 'extensions', 'microbit.workspace-storage');
-const welcomeDir = path.join(root, 'welcome');
+const welcomeDir = path.join(root, 'welcome-workspace');
 
 /**
- * Walk `welcome/` and return [{ path, contents }] entries. Returns [] if the
- * directory is missing or empty. Dotfiles are skipped.
+ * Walk `welcome-workspace/` and return [{ path, contents }] entries. Returns []
+ * if the directory is missing or empty. Dotfiles are skipped.
  *
- * Paths use forward slashes and are relative to `welcome/`. The extension
- * seeds these into `memfs:/welcome/<path>` at activation time.
+ * TODO: If dotfiles are needed in the future, we should probably exclude
+ * OS-generated ones like `.DS_Store` but not all dotfiles.
+ *
+ * Paths use forward slashes and are relative to `welcome-workspace/`. The
+ * extension seeds these into `memfs:/welcome/<path>` at activation time.
  */
 async function collectWelcomeFiles() {
 	let topLevel;

@@ -9,7 +9,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const vscodeWebDist = path.join(root, 'node_modules', 'vscode-web', 'dist');
 const publicDir = path.join(root, 'public');
-const productTemplate = path.join(root, 'product.template.json');
+const productTemplate = path.join(root, 'config', 'product.template.json');
 
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });

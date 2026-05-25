@@ -25,7 +25,7 @@ npm run build:extensions
 configured extensions are downloaded from Open VSX as `.vsix` files
 into `.cache/vsix/`.
 
-If no version is specified in `scripts/extensions.config.json`, the build
+If no version is specified in `config/extensions.config.json`, the build
 script checks if there is a newer version in Open VSX to determine if it
 needs to download it. In `npm run dev` this can cause Open VSX rate limiting.
 
@@ -34,7 +34,7 @@ needs to download it. In `npm run dev` this can cause Open VSX rate limiting.
 ### Extensions
 
 - Add: Append `{ "publisher": "...", "name": "..." }` to
-  `scripts/extensions.config.json`, run `npm run build`.
+  `config/extensions.config.json`, run `npm run build`.
 - Pin a version: Add `"version": "x.y.z"` to the entry. Recommended to
   avoid being rate limited by Open VSX during development.
 - Check for updates: `npm run check:extensions` reports outdated extensions.
@@ -48,8 +48,8 @@ To update, bump it and `npm install`; `npm run build` flattens
 
 ### Theme
 
-1. Add theme extension to `scripts/extensions.config.json`.
-2. Update the `product.template.json` file
+1. Add theme extension to `config/extensions.config.json`.
+2. Update the `config/product.template.json` file
 
 ```json
 "configurationDefaults": { "workbench.colorTheme": "micro:bit Pixel Light" }

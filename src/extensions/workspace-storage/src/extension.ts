@@ -13,8 +13,8 @@ import { IdbFS } from './idbfs.js';
 import { LocalFS } from './localfs.js';
 
 // Injected at build time by `scripts/build-extension.mjs` via esbuild's
-// `define` option. Each entry is a path relative to `welcome/` plus its
-// UTF-8 contents. Empty array if `welcome/` is missing or empty.
+// `define` option. Each entry is a path relative to `welcome-workspace/` plus
+// its UTF-8 contents. Empty array if `welcome-workspace/` is missing or empty.
 declare const __WELCOME_FILES__: ReadonlyArray<{ path: string; contents: string }>;
 
 type CoreFS = MemFS | IdbFS | LocalFS;
@@ -207,7 +207,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	);
 
 	// Seed the welcome workspace into memfs. The manifest is generated at build
-	// time by walking the repo-root `welcome/` directory (see
+	// time by walking the repo-root `welcome-workspace/` directory (see
 	// `scripts/build-extension.mjs`); memfs is wiped on every reload so this
 	// rewrites the full tree on each activation. Cheap, ~kb of data.
 	seedWelcome(memfs);
