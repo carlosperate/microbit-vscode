@@ -1,7 +1,7 @@
 [
-	{ "publisher": "carlosperate", "name": "uf2editor" },
-	{ "publisher": "carlosperate", "name": "microbit-themes" },
-	{ "publisher": "ms-vscode", "name": "cpptools-themes" },
-	{ "publisher": "eclipse-cdt", "name": "serial-monitor" },
-	{ "publisher": "arm", "name": "device-manager" }
+	{ "publisher": "carlosperate", "name": "uf2editor", "version": "0.1.2" },
+	{ "publisher": "carlosperate", "name": "microbit-themes", "version": "0.1.0" },
+	{ "publisher": "ms-vscode", "name": "cpptools-themes", "version": "2.0.0" },
+	{ "publisher": "eclipse-cdt", "name": "serial-monitor", "version": "2.0.0" },
+	{ "publisher": "arm", "name": "device-manager", "version": "1.22.0" }
 ]

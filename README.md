@@ -17,6 +17,8 @@ npm run dev
 
 Then open <http://localhost:8080/>.
 
+Developer documentation is available in the [dev.md](dev.md) file.
+
 ## License and acknowledgements
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
