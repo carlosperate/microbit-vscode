@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const srcDir = path.join(root, 'src', 'extensions', 'workspace-storage');
-const outDir = path.join(root, 'dist', 'extensions', 'microbit.workspace-storage');
+const outDir = path.join(root, 'dist', 'extensions', 'carlosperate.microbit-ide-workspace-storage');
 const welcomeDir = path.join(root, 'welcome-workspace');
 
 /**
@@ -75,7 +75,7 @@ export async function buildWorkspaceStorageExtension() {
 	await copyFile(path.join(srcDir, 'package.json'), path.join(outDir, 'package.json'));
 	// Empty NLS stub so VS Code's localized-strings probe doesn't 404.
 	await writeFile(path.join(outDir, 'package.nls.json'), '{}\n');
-	return { scheme: 'http', path: '/extensions/microbit.workspace-storage' };
+	return { scheme: 'http', path: '/extensions/carlosperate.microbit-ide-workspace-storage' };
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;

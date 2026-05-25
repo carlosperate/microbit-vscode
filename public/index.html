@@ -98,7 +98,7 @@
 						// not reachable from the extension host worker). Picks a folder,
 						// persists the `FileSystemDirectoryHandle` to IndexedDB so the
 						// worker can pick it up via `loadStoredHandle`, returns boolean.
-						id: 'microbit._pickLocalFolderHost',
+						id: 'microbitIde._pickLocalFolderHost',
 						handler: async () => {
 							if (typeof window.showDirectoryPicker !== 'function') return false;
 							let handle;

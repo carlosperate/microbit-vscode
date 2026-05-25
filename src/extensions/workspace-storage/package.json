@@ -1,8 +1,8 @@
 {
-	"name": "workspace-storage",
-	"displayName": "micro:bit Workspace Storage",
+	"name": "microbit-ide-workspace-storage",
+	"displayName": "micro:bit IDE Workspace Storage",
 	"description": "Provides memfs / idbfs / localfs file-system providers for the micro:bit Web IDE.",
-	"publisher": "microbit",
+	"publisher": "carlosperate",
 	"version": "0.1.0",
 	"private": true,
 	"engines": {
@@ -18,12 +18,12 @@
 	"contributes": {
 		"commands": [
 			{
-				"command": "microbit.switchStorage",
-				"title": "micro:bit: Switch Workspace Storage"
+				"command": "microbitIde.switchStorage",
+				"title": "micro:bit IDE: Switch Workspace Storage"
 			},
 			{
-				"command": "microbit.openLocalFolder",
-				"title": "micro:bit: Open Local Folder (File System Access)"
+				"command": "microbitIde.openLocalFolder",
+				"title": "micro:bit IDE: Open Local Folder (File System Access)"
 			}
 		]
 	}

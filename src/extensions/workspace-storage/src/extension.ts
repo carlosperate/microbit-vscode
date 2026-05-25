@@ -63,7 +63,7 @@ async function showWelcomeTabs(context: vscode.ExtensionContext): Promise<void> 
 			viewColumn: vscode.ViewColumn.Beside,
 		});
 	} catch (e: any) {
-		console.warn('[microbit.workspace-storage] welcome auto-open failed:', e?.message ?? e);
+		console.warn('[carlosperate.microbit-ide-workspace-storage] welcome auto-open failed:', e?.message ?? e);
 	}
 }
 
@@ -249,7 +249,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	}
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('microbit.switchStorage', async () => {
+		vscode.commands.registerCommand('microbitIde.switchStorage', async () => {
 			const pick = await vscode.window.showQuickPick(
 				[
 					{ label: 'memfs:// (ephemeral)', scheme: 'memfs' },
@@ -260,14 +260,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			);
 			if (!pick) return;
 			if (pick.scheme === 'localfs' && !localfs.hasRoot()) {
-				await vscode.commands.executeCommand('microbit.openLocalFolder');
+				await vscode.commands.executeCommand('microbitIde.openLocalFolder');
 				return;
 			}
 			if (!setWorkspaceRoot(vscode.Uri.parse(`${pick.scheme}:/`))) {
 				vscode.window.showErrorMessage(`Failed to switch workspace to ${pick.scheme}://`);
 			}
 		}),
-		vscode.commands.registerCommand('microbit.openLocalFolder', async () => {
+		vscode.commands.registerCommand('microbitIde.openLocalFolder', async () => {
 			// `showDirectoryPicker` is window-only; the extension host runs in a
 			// Web Worker that has no `window`. We delegate to a host-side command
 			// registered via `IWorkbenchConstructionOptions.commands` in
@@ -276,7 +276,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			let ok: boolean;
 			try {
 				ok = (await vscode.commands.executeCommand<boolean>(
-					'microbit._pickLocalFolderHost'
+					'microbitIde._pickLocalFolderHost'
 				)) === true;
 			} catch (e: any) {
 				vscode.window.showErrorMessage(
