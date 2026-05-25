@@ -19,12 +19,12 @@ describe('rebase', () => {
 			{ scheme: 'http', path: '/extensions/foo' },
 			'user.github.io',
 			'https',
-			'/vscode-microbit'
+			'/microbit-vscode'
 		);
 		expect(out).toEqual({
 			scheme: 'https',
 			authority: 'user.github.io',
-			path: '/vscode-microbit/extensions/foo',
+			path: '/microbit-vscode/extensions/foo',
 		});
 	});
 
@@ -48,11 +48,11 @@ describe('rebase', () => {
 			authority: 'cdn.example.com',
 			path: '/extensions/foo',
 		};
-		expect(rebase(input, 'user.github.io', 'https', '/vscode-microbit')).toEqual(input);
+		expect(rebase(input, 'user.github.io', 'https', '/microbit-vscode')).toEqual(input);
 	});
 
 	it('leaves a URI alone when scheme is not http or https', () => {
 		const input = { scheme: 'memfs', path: '/welcome' };
-		expect(rebase(input, 'user.github.io', 'https', '/vscode-microbit')).toEqual(input);
+		expect(rebase(input, 'user.github.io', 'https', '/microbit-vscode')).toEqual(input);
 	});
 });

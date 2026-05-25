@@ -1,5 +1,5 @@
 {
-  "name": "vscode-microbit",
+  "name": "microbit-vscode",
   "private": true,
   "version": "0.1.0",
   "description": "Browser-only VS Code (micro:bit Web IDE) for static GitHub Pages deployment.",
