@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "build:ext": "node scripts/build-extension.mjs",
-    "build:extensions": "node scripts/fetch-openvsx.mjs",
+    "build:local-extensions": "node scripts/build-local-extensions.mjs",
+    "build:openvsx-extensions": "node scripts/fetch-openvsx.mjs",
     "check:extensions": "node scripts/fetch-openvsx.mjs --check",
     "dev": "npm run build && sirv dist --port 8080 --single",
     "test": "vitest",

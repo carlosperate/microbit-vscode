@@ -12,11 +12,11 @@ npm run clean
 # Runs the `vitest` unit suite
 npm test
 
-# Rebuilds only the custom `workspace-storage` extension (esbuild)
-npm run build:ext
+# Rebuilds only the local extensions authored in this repo (esbuild)
+npm run build:local-extensions
 
 # Runs only the Open VSX fetch/unpack step
-npm run build:extensions
+npm run build:openvsx-extensions
 ```
 
 ## Open VSX cache & rate limiting
@@ -37,7 +37,7 @@ needs to download it. In `npm run dev` this can cause Open VSX rate limiting.
   `config/extensions.config.json`, run `npm run build`.
 - Pin a version: Add `"version": "x.y.z"` to the entry. Recommended to
   avoid being rate limited by Open VSX during development.
-- Check for updates: `npm run check:extensions` reports outdated extensions.
+- Check for updates: `npm run check:extensions` reports outdated Open VSX extensions.
 
 ### VS Code
 

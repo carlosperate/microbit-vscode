@@ -5,6 +5,9 @@
 	"publisher": "carlosperate",
 	"version": "0.1.0",
 	"private": true,
+	"scripts": {
+		"build": "node esbuild.config.mjs"
+	},
 	"engines": {
 		"vscode": "^1.91.0"
 	},
