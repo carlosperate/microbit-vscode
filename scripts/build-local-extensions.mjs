@@ -50,6 +50,7 @@ async function buildLocalExtension(srcDir) {
 export async function buildLocalExtensions() {
 	const refs = [];
 	for (const srcDir of localExtensions) {
+		console.log(`\tBuilding  ${path.relative('.', srcDir)}`);
 		refs.push(await buildLocalExtension(srcDir));
 	}
 	return refs;

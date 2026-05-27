@@ -1,26 +1,87 @@
-import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
-import { createWriteStream } from 'node:fs';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createWriteStream, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
 import { finished } from 'node:stream/promises';
 import semver from 'semver';
-import { unpackVsix } from './lib/vsix.mjs';
+import yauzl from 'yauzl';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = path.join(root, 'config', 'extensions.config.json');
 const cacheDir = path.join(root, '.cache', 'vsix');
 const distExtensions = path.join(root, 'dist', 'extensions');
 
-async function exists(p) {
-	try {
-		await access(p);
-		return true;
-	} catch {
-		return false;
-	}
+const VSIX_PREFIX = 'extension/';
+
+/** Read and parse config/extensions.config.json. */
+function loadExtensionsConfig() {
+	return JSON.parse(readFileSync(configPath, 'utf8'));
 }
 
+/**
+ * Unpack the `extension/` directory of a VSIX (which is a ZIP) into outDir.
+ * Strips the `extension/` prefix. Entries outside `extension/` are ignored.
+ *
+ * @throws If the ZIP is invalid or any file operations fail.
+ *
+ * @param {string} zipPath Path to the VSIX file.
+ * @param {string} outDir Directory to write the unpacked extension files into.
+ *     Will be created if it doesn't exist. Will be emptied if it does exist.
+ * @returns {Promise<void>} Resolves when unpacking is complete.
+ */
+export async function unpackVsix(zipPath, outDir) {
+	await rm(outDir, { recursive: true, force: true });
+	await mkdir(outDir, { recursive: true });
+
+	return new Promise((resolve, reject) => {
+		yauzl.open(zipPath, { lazyEntries: true }, (err, zip) => {
+			if (err) return reject(err);
+			zip.on('error', reject);
+			zip.on('end', resolve);
+			zip.on('entry', (entry) => {
+				const name = entry.fileName;
+				if (!name.startsWith(VSIX_PREFIX) || name === VSIX_PREFIX) {
+					zip.readEntry();
+					return;
+				}
+				const rel = name.slice(VSIX_PREFIX.length);
+				const dest = path.join(outDir, rel);
+
+				if (name.endsWith('/')) {
+					mkdir(dest, { recursive: true })
+						.then(() => zip.readEntry())
+						.catch(reject);
+					return;
+				}
+
+				mkdir(path.dirname(dest), { recursive: true })
+					.then(() => {
+						zip.openReadStream(entry, (err, stream) => {
+							if (err) return reject(err);
+							const out = createWriteStream(dest);
+							stream.pipe(out);
+							out.on('finish', () => zip.readEntry());
+							out.on('error', reject);
+						});
+					})
+					.catch(reject);
+			});
+			zip.readEntry();
+		});
+	});
+}
+
+/**
+ * Get the latest version from a Open VSX package.
+ *
+ * Retries a few times with backoff if the request fails or is rate-limited.
+ * Throws if all attempts fail or if the response is invalid.
+ * 
+ * @param {string} publisher
+ * @param {string} name
+ * @returns {Promise<string>} Latest version string from the registry
+ */
 async function resolveVersion(publisher, name) {
 	const url = `https://open-vsx.org/api/${publisher}/${name}`;
 	const delays = [0, 1000, 3000, 7000];
@@ -44,12 +105,12 @@ async function resolveVersion(publisher, name) {
  * One metadata request per extension (so it counts against the same rate limit
  * as a build that resolves versions).
  *
- * Returns one result row per extension:
- *   { id, pinned, latest, status, error? }
- *   status = 'outdated' | 'current' | 'ahead' | 'unpinned' | 'error'
+ * @param {Array<{ publisher: string, name: string, version?: string }>} config
+ * @returns {Promise<Array<{ id: string, pinned: string|null, latest: string|null, status: string, error?: string }>>}
+ *     One result per extension in the config, with status vs registry.
+ *     status = 'outdated' | 'current' | 'ahead' | 'unpinned' | 'error'
  */
-export async function checkExtensionUpdates() {
-	const config = JSON.parse(await readFile(configPath, 'utf8'));
+export async function checkExtensionUpdates(config) {
 	const results = [];
 	for (const { publisher, name, version: pinned } of config) {
 		const id = `${publisher}.${name}`;
@@ -78,6 +139,9 @@ export async function checkExtensionUpdates() {
 
 /**
  * Print the result of `checkExtensionUpdates()` to stdout.
+ *
+ * @param {Array<{ id: string, pinned: string|null, latest: string|null, status: string, error?: string }>} results
+ *     The results from `checkExtensionUpdates()`.
  */
 function printUpdateCheck(results) {
 	const idWidth = Math.max(...results.map((r) => r.id.length));
@@ -91,13 +155,11 @@ function printUpdateCheck(results) {
 	console.log('Checking Open VSX for newer extension versions...\n');
 	for (const r of results) {
 		const id = r.id.padEnd(idWidth);
-		if (r.status === 'outdated') {
-			console.log(`  ${id}  ${r.pinned} → ${r.latest}   ${labels.outdated}`);
-		} else if (r.status === 'error') {
+		if (r.status === 'error') {
 			console.log(`  ${id}  ${labels.error}: ${r.error}`);
 		} else {
 			const latest = r.latest ? ` (latest ${r.latest})` : '';
-			console.log(`  ${id}  ${r.pinned ?? '—'}${latest}   ${labels[r.status]}`);
+			console.log(`  ${id}  ${r.pinned ?? '—'}${latest}\t\t${labels[r.status]}`);
 		}
 	}
 	const outdated = results.filter((r) => r.status === 'outdated');
@@ -126,7 +188,7 @@ async function downloadVsix(publisher, name, version, destPath) {
 }
 
 export async function fetchAndUnpackExtensions() {
-	const config = JSON.parse(await readFile(configPath, 'utf8'));
+	const config = loadExtensionsConfig();
 	await mkdir(cacheDir, { recursive: true });
 	await mkdir(distExtensions, { recursive: true });
 
@@ -136,10 +198,10 @@ export async function fetchAndUnpackExtensions() {
 		const id = `${publisher}.${name}`;
 		const vsixPath = path.join(cacheDir, `${id}-${version}.vsix`);
 
-		if (await exists(vsixPath)) {
-			console.log(`Cached    ${id}@${version}`);
+		if (existsSync(vsixPath)) {
+			console.log(`\tCached    ${id}@${version}`);
 		} else {
-			console.log(`Downloading ${id}@${version}`);
+			console.log(`\tDownloading ${id}@${version}`);
 			await downloadVsix(publisher, name, version, vsixPath);
 		}
 
@@ -149,7 +211,7 @@ export async function fetchAndUnpackExtensions() {
 		const pkg = JSON.parse(await readFile(path.join(outDir, 'package.json'), 'utf8'));
 		if (pkg.main && !pkg.browser) {
 			console.warn(
-				`⚠️  ${id} has a "main" entry with no "browser" one, likely won't run in vscode-web`
+				`\t⚠️  ${id} has a "main" entry with no "browser" one, likely won't run in vscode-web`
 			);
 		}
 
@@ -157,7 +219,7 @@ export async function fetchAndUnpackExtensions() {
 		// Most extensions don't ship one, producing dozens of harmless 404 logs.
 		// Write an empty {} stub to silence the noise.
 		const nlsPath = path.join(outDir, 'package.nls.json');
-		if (!(await exists(nlsPath))) {
+		if (!existsSync(nlsPath)) {
 			await writeFile(nlsPath, '{}\n');
 		}
 
@@ -169,7 +231,7 @@ export async function fetchAndUnpackExtensions() {
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
 	if (process.argv.includes('--check')) {
-		checkExtensionUpdates()
+		checkExtensionUpdates(loadExtensionsConfig())
 			.then(printUpdateCheck)
 			.catch((e) => {
 				console.error(e);

@@ -20,13 +20,13 @@ await cp(vscodeWebDist, path.join(dist, 'vscode'), { recursive: true });
 console.log('Copying public/ → dist/');
 await cp(publicDir, dist, { recursive: true });
 
-console.log('Building local extensions');
+console.log('Building local extensions:');
 const localExtensionRefs = await buildLocalExtensions();
 
-console.log('Fetching Open VSX extensions');
+console.log('Fetching Open VSX extensions:');
 const openvsxExtensionRefs = await fetchAndUnpackExtensions();
 
-console.log('Rendering product.json');
+console.log('Generating dist/product.json');
 const product = JSON.parse(await readFile(productTemplate, 'utf8'));
 const vscodeWebPkg = JSON.parse(
 	await readFile(path.join(root, 'node_modules', 'vscode-web', 'package.json'), 'utf8')
@@ -42,4 +42,4 @@ product.additionalBuiltinExtensions = [
 ];
 await writeFile(path.join(dist, 'product.json'), JSON.stringify(product, null, '\t') + '\n');
 
-console.log('Build complete: dist/');
+console.log('Build complete 🚀');
