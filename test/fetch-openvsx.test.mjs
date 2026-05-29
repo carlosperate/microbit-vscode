@@ -3,7 +3,7 @@ import { mkdir, rm, writeFile, readFile, stat, mkdtemp } from 'node:fs/promises'
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import os from 'node:os';
-import { unpackVsix, checkExtensionUpdates } from '../scripts/fetch-openvsx.mjs';
+import { unpackVsix, checkExtensionUpdates } from '../build-scripts/fetch-openvsx.mjs';
 
 describe('unpackVsix', () => {
 	let work;

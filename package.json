@@ -5,10 +5,10 @@
   "description": "Browser-only VS Code (micro:bit Web IDE) for static GitHub Pages deployment.",
   "type": "module",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "build:local-extensions": "node scripts/build-local-extensions.mjs",
-    "build:openvsx-extensions": "node scripts/fetch-openvsx.mjs",
-    "check:extensions": "node scripts/fetch-openvsx.mjs --check",
+    "build": "node build-scripts/build.mjs",
+    "build:local-extensions": "node build-scripts/build-local-extensions.mjs",
+    "build:openvsx-extensions": "node build-scripts/fetch-openvsx.mjs",
+    "check:extensions": "node build-scripts/fetch-openvsx.mjs --check",
     "dev": "npm run build && sirv dist --port 8080 --single",
     "test": "vitest",
     "clean": "rimraf dist .cache"
