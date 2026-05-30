@@ -6,12 +6,13 @@
   "type": "module",
   "scripts": {
     "build": "node build-scripts/build.mjs",
+    "build:vscode": "node build-scripts/docker-build-vscode.mjs",
     "build:local-extensions": "node build-scripts/build-local-extensions.mjs",
     "build:openvsx-extensions": "node build-scripts/fetch-openvsx.mjs",
     "check:extensions": "node build-scripts/fetch-openvsx.mjs --check",
     "dev": "npm run build && sirv dist --port 8080 --single",
     "test": "vitest",
-    "clean": "rimraf dist .cache"
+    "clean": "rimraf .cache dist"
   },
   "dependencies": {
     "vscode-web": "^1.91.1"

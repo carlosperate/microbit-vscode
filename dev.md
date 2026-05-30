@@ -46,6 +46,18 @@ Pinned via the `vscode-web` dependency in `package.json`.
 To update, bump it and `npm install`; `npm run build` flattens
 `node_modules/vscode-web/dist/*` into `dist/vscode/`.
 
+#### Building VS Code from source (`npm run build:vscode`)
+
+Builds the web bundle from `microsoft/vscode` in Docker (version pinned in
+`config/vscode-web.config.json`) into `.cache/vscode-web/` (build scratch lives
+in `.cache/vscode-build/`). Full docs land later; for now the one thing that bites:
+
+> **Give Docker ≥9 GB RAM.** `gulp vscode-web-min` runs Node with an 8 GB heap
+> and a memory-hungry mangler pass. On a smaller Docker VM the build GC-thrashes
+> and appears to hang at the `compile-src`/mangler step (CPU busy, no progress).
+> Raise it in Docker Desktop → Settings → Resources → Memory. The wrapper warns
+> when the VM looks too small.
+
 ### Theme
 
 1. Add theme extension to `config/extensions.config.json`.
