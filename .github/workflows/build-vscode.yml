@@ -1,0 +1,48 @@
+name: Build vscode-web
+
+on:
+  push:
+    tags: ['vscode-web-v*']
+
+jobs:
+  build:
+    name: Build and release vscode-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Use Node.js 24.x
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24.x
+
+      - name: Verify tag matches config
+        run: |
+          CONFIG_VERSION=$(node -p "require('./config/vscode-web.config.json').vscodeVersion")
+          EXPECTED="vscode-web-v${CONFIG_VERSION}"
+          if [ "$GITHUB_REF_NAME" != "$EXPECTED" ]; then
+            echo "Tag mismatch: pushed '$GITHUB_REF_NAME' but config/vscode-web.config.json says '$EXPECTED'" >&2
+            exit 1
+          fi
+
+      - name: Build VS Code in Docker
+        run: npm run build:vscode
+
+      - name: Package + checksum
+        # Asset name carries the version; the archive expands to a `vscode-web/` folder.
+        run: |
+          cd .cache
+          zip -r "../${GITHUB_REF_NAME}.zip" vscode-web
+          cd ..
+          sha256sum "${GITHUB_REF_NAME}.zip" > "${GITHUB_REF_NAME}.zip.sha256"
+
+      - name: Create release (if missing) and upload assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 \
+            || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" "${GITHUB_REF_NAME}.zip" "${GITHUB_REF_NAME}.zip.sha256" --clobber
