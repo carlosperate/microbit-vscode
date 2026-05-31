@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchAndUnpackExtensions } from './fetch-openvsx.mjs';
 import { buildLocalExtensions } from './build-local-extensions.mjs';
+import { fetchVscodeWeb } from './fetch-vscode-web.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
@@ -17,8 +18,7 @@ const productTemplate = path.join(root, 'config', 'product.template.json');
  * Default: the local source build at .cache/vscode-web.
  * `--vscode-web-npm` opts into the legacy `vscode-web` npm package.
  */
-function resolveVscodeWebSource(argv) {
-	const useNpm = argv.includes('--vscode-web-npm');
+function resolveVscodeWebSource(useNpm) {
 	const dir = useNpm
 		? path.join(root, 'node_modules', 'vscode-web', 'dist')
 		: path.join(root, '.cache', 'vscode-web');
@@ -71,7 +71,14 @@ async function writeProductJson(vscodeWebVersion, extensionRefs) {
 }
 
 async function main(argv = process.argv.slice(2)) {
-	const vscodeWeb = resolveVscodeWebSource(argv);
+	const useNpmVscodeWeb = argv.includes('--vscode-web-npm');
+	// Default path: make sure .cache/vscode-web exists and matches the pinned
+	// version before we try to consume it. Skipped for the npm build route
+	// (--vscode-web-npm), which has its own source under node_modules/.
+	if (!useNpmVscodeWeb) {
+		await fetchVscodeWeb();
+	}
+	const vscodeWeb = resolveVscodeWebSource(useNpmVscodeWeb);
 	const vscodeWebPkg = JSON.parse(await readFile(vscodeWeb.pkgPath, 'utf8'));
 	console.log(`vscode-web source: ${vscodeWeb.label} @ ${vscodeWebPkg.version}`);
 

@@ -69,14 +69,15 @@ To update the VS Code version used, update it from the `config/vscode-web.config
 and once everything is tested and ready, it has to be published as a GH release
 in a tag named `vscode-web-vX.Y.Z`, so that future builds can fetch it.
 
-#### Building VS Code from source 
+#### Building VS Code from source
 
 The normal path is to run `npm run build:vscode`.
 
 A docker image fetches the `microsoft/vscode` source code at the version pinned
-in `config/vscode-web.config.json`, and the final builds goes into
-`.cache/vscode-web/`.Full docs land later; for now the one thing that bites:
+in `config/vscode-web.config.json`, and the final build goes into
+`.cache/vscode-web/`.
 
+> [!WARNING]
 > **Give Docker ≥9 GB RAM.** `gulp vscode-web-min` runs Node with an 8 GB heap
 > and a memory-hungry mangler pass. On a smaller Docker VM the build GC-thrashes
 > and appears to hang at the `compile-src`/mangler step.
@@ -84,3 +85,16 @@ in `config/vscode-web.config.json`, and the final builds goes into
 Alternatively the `npm run build:old-vscode-web` script runs the older build
 pipeline fetching the pre-compiled VS Code v1.91.1 bundle included
 by the `vscode-web` npm package from `Felx-B/vscode-web`.
+
+## Testing over https
+
+Some extensions load from a public `*.vscode-cdn.net` webview, and Chrome
+blocks it due to CORS policy from a local server. Expose the dev server via
+a public tunnel to reproduce the deployed https setup:
+
+```sh
+npm run dev
+cloudflared tunnel --url http://localhost:8080
+```
+
+Open the printed `https://<random>.trycloudflare.com` URL, not `localhost`.

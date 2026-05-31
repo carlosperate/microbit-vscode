@@ -3,7 +3,7 @@
 A browser-based VS Code instance, deployable as a static site to GitHub Pages, pre-configured for micro:bit development.
 No installation, no login, only open the URL and start coding.
 
-Built on top of the [`vscode-web`](https://github.com/Felx-B/vscode-web) npm package, with extensions pulled from [Open VSX](https://open-vsx.org/) at build time.
+VS Code built from source, with work based on  [`vscode-web`](https://github.com/Felx-B/vscode-web), and extensions pulled from [Open VSX](https://open-vsx.org/) at build time.
 
 > **Status:** Early WIP development.
 
@@ -26,5 +26,5 @@ This project is licensed under the MIT License. See the [LICENSE](./LICENSE) fil
 This project wouldn't be possible without the following open source projects:
 
 - [Microsoft VS Code](https://github.com/microsoft/vscode): The underlying editor (MIT).
-- [Felx-B/vscode-web](https://github.com/Felx-B/vscode-web): The community-maintained `vscode-web` npm package.
+- [Felx-B/vscode-web](https://github.com/Felx-B/vscode-web): The bootstrap patch our VS Code build adapts (MIT).
 - [Open VSX](https://open-vsx.org/): The VS Code extension marketplace this build uses.
