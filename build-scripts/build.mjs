@@ -78,26 +78,20 @@ async function main(argv = process.argv.slice(2)) {
 	if (!useNpmVscodeWeb) {
 		await fetchVscodeWeb();
 	}
-	console.error('[build] fetchVscodeWeb done, resolving source');
 	const vscodeWeb = resolveVscodeWebSource(useNpmVscodeWeb);
 	const vscodeWebPkg = JSON.parse(await readFile(vscodeWeb.pkgPath, 'utf8'));
 	console.log(`vscode-web source: ${vscodeWeb.label} @ ${vscodeWebPkg.version}`);
 
-	console.error('[build] resetDist');
 	await resetDist();
-	console.error('[build] copyStaticAssets');
 	await copyStaticAssets(vscodeWeb.dir);
 
 	console.log('Building local extensions:');
 	const localExtensionRefs = await buildLocalExtensions();
-	console.error('[build] local extensions done');
 
 	console.log('Fetching Open VSX extensions:');
 	const openvsxExtensionRefs = await fetchAndUnpackExtensions();
-	console.error('[build] open vsx done');
 
 	await writeProductJson(vscodeWebPkg.version, [...localExtensionRefs, ...openvsxExtensionRefs]);
-	console.error('[build] product.json written');
 
 	console.log('Build complete 🚀');
 }

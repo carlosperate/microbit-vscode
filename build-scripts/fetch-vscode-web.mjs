@@ -23,9 +23,8 @@
  */
 
 import { mkdir, rm, readFile, writeFile } from 'node:fs/promises';
-import { existsSync, readFileSync, createWriteStream } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import yauzl from 'yauzl';
@@ -119,34 +118,36 @@ async function downloadFile(url, destPath, fetchImpl, ctx) {
 	await writeFile(destPath, buf);
 }
 
-/** Unzip into destDir, guarding every entry against zip-slip. */
-async function unzip(zipPath, destDir) {
+/**
+ * Unzip an in-memory zip Buffer into destDir, guarding every entry against
+ * zip-slip.
+ *
+ * We use yauzl.fromBuffer (not yauzl.open) deliberately: yauzl's fd-backed read
+ * streams (fd-slicer doing a per-entry fs.read) deadlock on large multi-chunk
+ * entries on Linux — the first chunk is read, then nothing re-schedules the
+ * next read and the event loop drains with the promise unsettled. Slicing an
+ * in-memory buffer skips fs.read entirely, so there's nothing to stall.
+ */
+async function unzip(zipBuffer, destDir) {
 	await mkdir(destDir, { recursive: true });
-	// autoClose:false so the fd lifecycle is ours — no race between yauzl's
-	// auto-close on 'end' and the entry pipelines still flushing to disk.
 	const zip = await new Promise((resolve, reject) =>
-		yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (err, z) =>
+		yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (err, z) =>
 			err ? reject(err) : resolve(z)
 		)
 	);
-	try {
-		await new Promise((resolve, reject) => {
-			zip.on('error', reject);
-			zip.on('end', resolve);
-			zip.on('entry', (entry) => {
-				// Drive each entry to completion, then pull the next. Any failure
-				// (zip-slip, mkdir, stream error, write error) rejects the whole
-				// unzip via pipeline's error propagation — so readEntry() is always
-				// either called again or the promise is settled; it can't hang.
-				extractEntry(zip, entry, destDir)
-					.then(() => zip.readEntry())
-					.catch(reject);
-			});
-			zip.readEntry();
+	await new Promise((resolve, reject) => {
+		zip.on('error', reject);
+		zip.on('end', resolve);
+		zip.on('entry', (entry) => {
+			// Drive each entry to completion, then pull the next. Any failure
+			// rejects the whole unzip, so readEntry() is always either called
+			// again or the promise is settled — it can't hang.
+			extractEntry(zip, entry, destDir)
+				.then(() => zip.readEntry())
+				.catch(reject);
 		});
-	} finally {
-		zip.close();
-	}
+		zip.readEntry();
+	});
 }
 
 /** Extract a single zip entry to destDir (directory or file), guarding zip-slip. */
@@ -160,9 +161,13 @@ async function extractEntry(zip, entry, destDir) {
 	const stream = await new Promise((resolve, reject) =>
 		zip.openReadStream(entry, (err, s) => (err ? reject(err) : resolve(s)))
 	);
-	// pipeline resolves only after the write is fully flushed, and rejects on
-	// errors from either the read stream or the write stream.
-	await pipeline(stream, createWriteStream(dest));
+	const chunks = await new Promise((resolve, reject) => {
+		const buf = [];
+		stream.on('data', (c) => buf.push(c));
+		stream.on('end', () => resolve(buf));
+		stream.on('error', reject);
+	});
+	await writeFile(dest, Buffer.concat(chunks));
 }
 
 /**
@@ -231,9 +236,7 @@ export async function fetchVscodeWeb({
 	}
 
 	log(`Unpacking ${zipName} → ${path.relative(root, bundleDir)}`);
-	console.error(`[fetch-vscode-web] unzip start: ${zipPath}`);
-	await unzip(zipPath, cacheDir);
-	console.error('[fetch-vscode-web] unzip done');
+	await unzip(await readFile(zipPath), cacheDir);
 
 	if (!existsSync(bundlePkg)) {
 		throw new Error(
