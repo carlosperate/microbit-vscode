@@ -231,7 +231,9 @@ export async function fetchVscodeWeb({
 	}
 
 	log(`Unpacking ${zipName} → ${path.relative(root, bundleDir)}`);
+	console.error(`[fetch-vscode-web] unzip start: ${zipPath}`);
 	await unzip(zipPath, cacheDir);
+	console.error('[fetch-vscode-web] unzip done');
 
 	if (!existsSync(bundlePkg)) {
 		throw new Error(

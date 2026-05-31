@@ -3,7 +3,7 @@ import { createWriteStream, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Readable } from 'node:stream';
-import { finished } from 'node:stream/promises';
+import { finished, pipeline } from 'node:stream/promises';
 import semver from 'semver';
 import yauzl from 'yauzl';
 
@@ -34,42 +34,50 @@ export async function unpackVsix(zipPath, outDir) {
 	await rm(outDir, { recursive: true, force: true });
 	await mkdir(outDir, { recursive: true });
 
-	return new Promise((resolve, reject) => {
-		yauzl.open(zipPath, { lazyEntries: true }, (err, zip) => {
-			if (err) return reject(err);
+	// autoClose:false so the fd lifecycle is ours — no race between yauzl's
+	// auto-close on 'end' and the entry pipelines still flushing to disk.
+	const zip = await new Promise((resolve, reject) =>
+		yauzl.open(zipPath, { lazyEntries: true, autoClose: false }, (err, z) =>
+			err ? reject(err) : resolve(z)
+		)
+	);
+	try {
+		await new Promise((resolve, reject) => {
 			zip.on('error', reject);
 			zip.on('end', resolve);
 			zip.on('entry', (entry) => {
-				const name = entry.fileName;
-				if (!name.startsWith(VSIX_PREFIX) || name === VSIX_PREFIX) {
-					zip.readEntry();
-					return;
-				}
-				const rel = name.slice(VSIX_PREFIX.length);
-				const dest = path.join(outDir, rel);
-
-				if (name.endsWith('/')) {
-					mkdir(dest, { recursive: true })
-						.then(() => zip.readEntry())
-						.catch(reject);
-					return;
-				}
-
-				mkdir(path.dirname(dest), { recursive: true })
-					.then(() => {
-						zip.openReadStream(entry, (err, stream) => {
-							if (err) return reject(err);
-							const out = createWriteStream(dest);
-							stream.pipe(out);
-							out.on('finish', () => zip.readEntry());
-							out.on('error', reject);
-						});
-					})
+				// Drive each entry to completion, then pull the next. Any failure
+				// rejects via pipeline's error propagation — so readEntry() is always
+				// either called again or the promise is settled; it can't hang.
+				unpackEntry(zip, entry, outDir)
+					.then(() => zip.readEntry())
 					.catch(reject);
 			});
 			zip.readEntry();
 		});
-	});
+	} finally {
+		zip.close();
+	}
+}
+
+/** Extract one VSIX entry under the `extension/` prefix into outDir (prefix stripped). */
+async function unpackEntry(zip, entry, outDir) {
+	const name = entry.fileName;
+	if (!name.startsWith(VSIX_PREFIX) || name === VSIX_PREFIX) {
+		return;
+	}
+	const dest = path.join(outDir, name.slice(VSIX_PREFIX.length));
+	if (name.endsWith('/')) {
+		await mkdir(dest, { recursive: true });
+		return;
+	}
+	await mkdir(path.dirname(dest), { recursive: true });
+	const stream = await new Promise((resolve, reject) =>
+		zip.openReadStream(entry, (err, s) => (err ? reject(err) : resolve(s)))
+	);
+	// pipeline resolves only after the write is fully flushed, and rejects on
+	// errors from either the read stream or the write stream.
+	await pipeline(stream, createWriteStream(dest));
 }
 
 /**
@@ -206,7 +214,9 @@ export async function fetchAndUnpackExtensions() {
 		}
 
 		const outDir = path.join(distExtensions, id);
+		console.error(`[openvsx] unpacking ${id} -> ${outDir}`);
 		await unpackVsix(vsixPath, outDir);
+		console.error(`[openvsx] unpacked ${id}`);
 
 		const pkg = JSON.parse(await readFile(path.join(outDir, 'package.json'), 'utf8'));
 		if (pkg.main && !pkg.browser) {
