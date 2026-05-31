@@ -41,10 +41,13 @@ needs to download it. In `npm run dev` this can cause Open VSX rate limiting.
 
 ### VS Code
 
-Pinned via the `vscode-web` dependency in `package.json`.
+`npm run build` consumes the web bundle from `.cache/vscode-web/`, produced by
+`npm run build:vscode` (Docker source build, below). It errors if that bundle is
+absent — no fallback. Version is pinned in `config/vscode-web.config.json`
+(`vscodeVersion`); to bump, edit it and re-run `npm run build:vscode`.
 
-To update, bump it and `npm install`; `npm run build` flattens
-`node_modules/vscode-web/dist/*` into `dist/vscode/`.
+`npm run build:old-vscode-web` builds from the legacy `vscode-web` npm package
+instead — kept only as an A/B comparison baseline, to be removed later.
 
 #### Building VS Code from source (`npm run build:vscode`)
 
