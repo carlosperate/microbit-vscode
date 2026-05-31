@@ -5,7 +5,6 @@
 ```sh
 npm run build
 npm run dev
-npm run clean
 ```
 
 ```sh
@@ -16,7 +15,10 @@ npm test
 npm run build:local-extensions
 
 # Runs only the Open VSX fetch/unpack step
-npm run build:openvsx-extensions
+npm run fetch:openvsx-extensions
+
+# Builds the vscode-web bundle from VS Code source (uses Docker)
+npm run build:vscode
 ```
 
 ## Open VSX cache & rate limiting
@@ -39,28 +41,6 @@ needs to download it. In `npm run dev` this can cause Open VSX rate limiting.
   avoid being rate limited by Open VSX during development.
 - Check for updates: `npm run check:extensions` reports outdated Open VSX extensions.
 
-### VS Code
-
-`npm run build` consumes the web bundle from `.cache/vscode-web/`, produced by
-`npm run build:vscode` (Docker source build, below). It errors if that bundle is
-absent — no fallback. Version is pinned in `config/vscode-web.config.json`
-(`vscodeVersion`); to bump, edit it and re-run `npm run build:vscode`.
-
-`npm run build:old-vscode-web` builds from the legacy `vscode-web` npm package
-instead — kept only as an A/B comparison baseline, to be removed later.
-
-#### Building VS Code from source (`npm run build:vscode`)
-
-Builds the web bundle from `microsoft/vscode` in Docker (version pinned in
-`config/vscode-web.config.json`) into `.cache/vscode-web/` (build scratch lives
-in `.cache/vscode-build/`). Full docs land later; for now the one thing that bites:
-
-> **Give Docker ≥9 GB RAM.** `gulp vscode-web-min` runs Node with an 8 GB heap
-> and a memory-hungry mangler pass. On a smaller Docker VM the build GC-thrashes
-> and appears to hang at the `compile-src`/mangler step (CPU busy, no progress).
-> Raise it in Docker Desktop → Settings → Resources → Memory. The wrapper warns
-> when the VM looks too small.
-
 ### Theme
 
 1. Add theme extension to `config/extensions.config.json`.
@@ -69,3 +49,38 @@ in `.cache/vscode-build/`). Full docs land later; for now the one thing that bit
 ```json
 "configurationDefaults": { "workbench.colorTheme": "micro:bit Pixel Light" }
 ```
+
+### VS Code
+
+`npm run build` consumes the web bundle from `.cache/vscode-web/`.
+
+If it's not there, the build script downloads it from a GH Release from this
+repository with the version specified in `config/vscode-web.config.json`,
+which can also be done with `npm run fetch:vscode`.
+
+If `.cache/vscode-web/` is already present and the version in its
+`package.json` matches the configured version it is used as-is.
+
+So, a local VS Code source build (`npm run build:vscode`) can also create the
+bundle locally in `.cache/vscode-web/` for consumption by the build.
+
+To update the VS Code version used, update it from the `config/vscode-web.config.json`
+`vscodeVersion` field. You can build it locally via `npm run build:vscode`
+and once everything is tested and ready, it has to be published as a GH release
+in a tag named `vscode-web-vX.Y.Z`, so that future builds can fetch it.
+
+#### Building VS Code from source 
+
+The normal path is to run `npm run build:vscode`.
+
+A docker image fetches the `microsoft/vscode` source code at the version pinned
+in `config/vscode-web.config.json`, and the final builds goes into
+`.cache/vscode-web/`.Full docs land later; for now the one thing that bites:
+
+> **Give Docker ≥9 GB RAM.** `gulp vscode-web-min` runs Node with an 8 GB heap
+> and a memory-hungry mangler pass. On a smaller Docker VM the build GC-thrashes
+> and appears to hang at the `compile-src`/mangler step.
+
+Alternatively the `npm run build:old-vscode-web` script runs the older build
+pipeline fetching the pre-compiled VS Code v1.91.1 bundle included
+by the `vscode-web` npm package from `Felx-B/vscode-web`.
