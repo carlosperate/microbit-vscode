@@ -92,6 +92,13 @@
 						trusted: true,
 					};
 				}
+				// Serve webview content (markdown preview, custom editors, …) from
+				// the `pre/` folder shipped in our own bundle. Without this, VS Code
+				// falls back to `https://{{uuid}}.vscode-cdn.net/{{quality}}/{{commit}}/…`;
+				// our product.json carries no `commit`, so it substitutes a stale
+				// hardcoded Insiders hash that Microsoft's CDN no longer serves (504).
+				opts.webviewEndpoint = `${BASE}/vscode/out/vs/workbench/contrib/webview/browser/pre`;
+
 				opts.commands = [
 					{
 						// Host-side bridge for `showDirectoryPicker` (window-only API,

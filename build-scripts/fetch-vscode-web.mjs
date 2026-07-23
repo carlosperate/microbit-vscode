@@ -19,7 +19,8 @@
  * <cache>/vscode-web-v<version>.zip (+ .sha256 in tracking mode), keyed by
  * version, so a version bump invalidates them automatically.
  *
- * Available as `npm run fetch:vscode`. Wired into `prebuild` in a later chunk.
+ * Available as `npm run fetch:vscode`, and called directly from build.mjs at
+ * the start of a default build (no npm lifecycle hook).
  */
 
 import { mkdir, rm, readFile, writeFile } from 'node:fs/promises';
