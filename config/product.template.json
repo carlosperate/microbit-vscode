@@ -15,7 +15,8 @@
 		"path": "/welcome"
 	},
 	"configurationDefaults": {
-		"workbench.colorTheme": "micro:bit Pixel Light"
+		"workbench.colorTheme": "micro:bit Pixel Light",
+		"micropython-lsp.target": "microbit"
 	},
 	"additionalBuiltinExtensions": []
 }
