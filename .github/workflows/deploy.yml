@@ -35,7 +35,7 @@ jobs:
           path: .cache/vscode-web
           key: vscode-web-${{ hashFiles('config/vscode-web.config.json') }}
       - name: Run tests
-        run: npm test -- --run
+        run: npm test
       - name: Build site
         run: npm run build
       - name: Upload artifact

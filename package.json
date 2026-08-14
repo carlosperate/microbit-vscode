@@ -12,8 +12,9 @@
     "build:local-extensions": "node build-scripts/build-local-extensions.mjs",
     "fetch:openvsx-extensions": "node build-scripts/fetch-openvsx.mjs",
     "check:extensions": "node build-scripts/fetch-openvsx.mjs --check",
-    "dev": "sirv dist --port 8080 --single",
-    "test": "vitest",
+    "dev": "sirv dist --port 8080 --single --dev",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "clean": "rimraf .cache dist"
   },
   "dependencies": {

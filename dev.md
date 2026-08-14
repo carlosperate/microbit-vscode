@@ -8,8 +8,11 @@ npm run dev
 ```
 
 ```sh
-# Runs the `vitest` unit suite
+# Runs the `vitest` unit suite once
 npm test
+
+# Same suite, re-running on every file change
+npm run test:watch
 
 # Rebuilds only the local extensions authored in this repo (esbuild)
 npm run build:local-extensions
