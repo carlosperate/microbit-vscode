@@ -3,9 +3,12 @@
 A zero-install VS Code, running entirely in your browser, pre-configured for
 micro:bit development.
 
+Currently configured for MicroPython development, more features to be added
+soon.
+
 ## Where are my files stored?
 
-You're currently in the **`memfs://`** workspace — an in-memory scratch space.
+The default workspace uses **`memfs://`**, an in-memory scratch space.
 Everything in it disappears when you reload the tab.
 
 Three storage backends are available:
@@ -16,15 +19,19 @@ Three storage backends are available:
 | `idbfs://`   | IndexedDB (this browser, this site)           | Yes              |
 | `localfs://` | A real folder on your disk (Chromium browsers) | Yes              |
 
-To switch: open the Command Palette (`Ctrl/Cmd-Shift-P`) and run
+To switch: open the Command Palette (`Ctrl/Cmd-Shift-P` or `F1`) and run
 **"micro:bit: Switch Workspace Storage"**.
 
 ## Getting started
 
-Open `main.py` next to this preview — it's a tiny MicroPython program that
-scrolls a greeting on the LED matrix. Edit it, then flash it to a connected
-micro:bit using the device-manager extension (look for the USB icon in the
-status bar).
+1. The `main.py` file should be already opened next to this preview.
+    - It's a small MicroPython example program.
+2. Look at the status bar at the bottom of the editor and click the micro:bit
+  entry with a plug icon.
+3. Select the action you'd like to perform: Flash the programme, save the hex,
+  or connect to the serial terminal.
+
+![Screenshot](https://raw.githubusercontent.com/carlosperate/vscode-microbit-micropython/main/assets/screenshot.png)
 
 ## Learn more
 

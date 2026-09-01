@@ -1,5 +1,5 @@
 # Welcome! See README.md (open as a preview tab beside this file) for an
-# overview of the micro:bit Web IDE and its storage options.
+# overview of the BBC micro:bit VS Code Web IDE and its storage options.
 
 from microbit import display, Image, sleep
 
