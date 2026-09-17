@@ -15,6 +15,11 @@ describe('MemFS', () => {
 		expect(dec(fs.readFile('/hello.txt'))).toBe('hi');
 	});
 
+	it('writeFile says whether it created the file, which decides the event a watcher sees', () => {
+		expect(fs.writeFile('/new.txt', enc('hi'), { create: true, overwrite: true })).toBe(true);
+		expect(fs.writeFile('/new.txt', enc('again'), { create: true, overwrite: true })).toBe(false);
+	});
+
 	it('createDirectory + writeFile inside → readDirectory lists the entry', () => {
 		fs.createDirectory('/dir');
 		fs.writeFile('/dir/a.txt', enc('x'), { create: true, overwrite: true });

@@ -129,7 +129,8 @@ export class MemFS {
 		return e.data;
 	}
 
-	writeFile(p: string, content: Uint8Array, options: { create: boolean; overwrite: boolean }): void {
+	/** True when the file was created, which a watcher for new files needs told apart from a change. */
+	writeFile(p: string, content: Uint8Array, options: { create: boolean; overwrite: boolean }): boolean {
 		const name = this.basename(p);
 		const parent = this.lookupParent(p);
 		const existing = parent.entries.get(name);
@@ -139,11 +140,12 @@ export class MemFS {
 			if (!options.overwrite) throw new FileExists(p);
 			existing.data = content;
 			existing.mtime = now;
-		} else {
-			if (!options.create) throw new FileNotFound(p);
-			parent.entries.set(name, { type: 'file', name, ctime: now, mtime: now, data: content });
-			parent.mtime = now;
+			return false;
 		}
+		if (!options.create) throw new FileNotFound(p);
+		parent.entries.set(name, { type: 'file', name, ctime: now, mtime: now, data: content });
+		parent.mtime = now;
+		return true;
 	}
 
 	rename(oldPath: string, newPath: string, options: { overwrite: boolean }): void {

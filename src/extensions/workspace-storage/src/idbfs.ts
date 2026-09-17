@@ -137,11 +137,12 @@ export class IdbFS {
 		return rec.data ?? new Uint8Array();
 	}
 
+	/** True when the file was created, which a watcher for new files needs told apart from a change. */
 	async writeFile(
 		path: string,
 		content: Uint8Array,
 		options: { create: boolean; overwrite: boolean }
-	): Promise<void> {
+	): Promise<boolean> {
 		await this.assertParent(path);
 		const existing = await this.get(path);
 		const now = Date.now();
@@ -149,10 +150,11 @@ export class IdbFS {
 			if (existing.type === 'directory') throw new FileIsADirectory(path);
 			if (!options.overwrite) throw new FileExists(path);
 			await this.put({ ...existing, data: content, mtime: now });
-		} else {
-			if (!options.create) throw new FileNotFound(path);
-			await this.put({ path: normalize(path), type: 'file', data: content, ctime: now, mtime: now });
+			return false;
 		}
+		if (!options.create) throw new FileNotFound(path);
+		await this.put({ path: normalize(path), type: 'file', data: content, ctime: now, mtime: now });
+		return true;
 	}
 
 	async createDirectory(path: string): Promise<void> {

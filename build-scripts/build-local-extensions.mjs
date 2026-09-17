@@ -40,20 +40,30 @@ async function buildLocalExtension(srcDir) {
 	// Empty NLS stub so VS Code's localized-strings probe doesn't 404.
 	await writeFile(path.join(outDir, 'package.nls.json'), '{}\n');
 
-	return { scheme: 'http', path: `/extensions/${distId}` };
+	return {
+		ref: { scheme: 'http', path: `/extensions/${distId}` },
+		id: distId,
+		// A proposed API is refused unless the product allows it for this id, and an
+		// allow-list kept by hand goes stale silently: the extension fails to activate.
+		proposals: pkg.enabledApiProposals ?? [],
+	};
 }
 
 /**
  * Build every local extension and return their `additionalBuiltinExtensions`
- * refs (one entry per extension), mirroring fetch-openvsx's return shape.
+ * refs, mirroring fetch-openvsx's return shape, plus the API proposals each
+ * manifest asks for, keyed by extension id.
  */
 export async function buildLocalExtensions() {
 	const refs = [];
+	const proposals = {};
 	for (const srcDir of localExtensions) {
 		console.log(`\tBuilding  ${path.relative('.', srcDir)}`);
-		refs.push(await buildLocalExtension(srcDir));
+		const built = await buildLocalExtension(srcDir);
+		refs.push(built.ref);
+		if (built.proposals.length > 0) proposals[built.id] = built.proposals;
 	}
-	return refs;
+	return { refs, proposals };
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;

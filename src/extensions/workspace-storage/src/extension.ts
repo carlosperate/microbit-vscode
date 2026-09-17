@@ -11,6 +11,8 @@ import {
 } from './memfs.js';
 import { IdbFS } from './idbfs.js';
 import { LocalFS } from './localfs.js';
+import { WorkspaceFileSearchProvider, WorkspaceTextSearchProvider } from './search.js';
+
 
 // Injected at build time by `esbuild.config.mjs` via esbuild's `define`
 // option. Each entry is a path relative to `welcome-workspace/` plus
@@ -29,7 +31,7 @@ function seedWelcome(memfs: MemFS): void {
 		memfs.createDirectory(WELCOME_ROOT);
 	} catch {
 		// Already exists (e.g. seeded by a previous activate in the same
-		// session). Safe to ignore — we still overwrite individual files below.
+		// session). Safe to ignore, we still overwrite individual files below.
 	}
 	const encoder = new TextEncoder();
 	for (const file of __WELCOME_FILES__) {
@@ -131,8 +133,11 @@ class FsAdapter implements vscode.FileSystemProvider {
 		options: { create: boolean; overwrite: boolean }
 	): Promise<void> {
 		try {
-			await Promise.resolve(this.core.writeFile(uri.path, content, options));
-			this.fire(uri, vscode.FileChangeType.Changed);
+			// A new file reported as Changed is invisible to any watcher built with
+			// `ignoreCreateEvents: false, ignoreChangeEvents: true`, which is how an
+			// extension watches for a file appearing.
+			const created = await Promise.resolve(this.core.writeFile(uri.path, content, options));
+			this.fire(uri, created ? vscode.FileChangeType.Created : vscode.FileChangeType.Changed);
 		} catch (e) {
 			throw toVscodeError(e, uri);
 		}
@@ -194,17 +199,28 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	const idbfs = new IdbFS();
 	const localfs = new LocalFS();
 
-	context.subscriptions.push(
-		vscode.workspace.registerFileSystemProvider('memfs', new FsAdapter(memfs), {
-			isCaseSensitive: true,
-		}),
-		vscode.workspace.registerFileSystemProvider('idbfs', new FsAdapter(idbfs), {
-			isCaseSensitive: true,
-		}),
-		vscode.workspace.registerFileSystemProvider('localfs', new FsAdapter(localfs), {
-			isCaseSensitive: true,
-		})
-	);
+	// One list, so a scheme cannot get a file system provider and no search provider.
+	const cores = { memfs, idbfs, localfs };
+	for (const [scheme, core] of Object.entries(cores)) {
+		context.subscriptions.push(
+			vscode.workspace.registerFileSystemProvider(scheme, new FsAdapter(core), { isCaseSensitive: true })
+		);
+	}
+
+	// Serving files is not enough: without these, `workspace.findFiles` never
+	// settles on these schemes and the Search view finds nothing. Both are
+	// proposed API, and registering one the host has not enabled throws, so a
+	// mismatch costs search rather than the workspace and every command below it.
+	try {
+		for (const [scheme, core] of Object.entries(cores)) {
+			context.subscriptions.push(
+				vscode.workspace.registerFileSearchProvider(scheme, new WorkspaceFileSearchProvider(scheme, core)),
+				vscode.workspace.registerTextSearchProvider(scheme, new WorkspaceTextSearchProvider(scheme, core))
+			);
+		}
+	} catch (e) {
+		console.warn(`micro:bit IDE: no workspace search (${String(e)})`);
+	}
 
 	// Seed the welcome workspace into memfs. The manifest is generated at build
 	// time by walking the repo-root `welcome-workspace/` directory (see
@@ -300,7 +316,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					return;
 				}
 			} catch {
-				/* old browsers without queryPermission — assume granted */
+				/* old browsers without queryPermission, assume granted */
 			}
 			localfs.setRoot(handle);
 			if (!setWorkspaceRoot(vscode.Uri.parse('localfs:/'))) {

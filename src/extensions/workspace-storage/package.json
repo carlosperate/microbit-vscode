@@ -12,6 +12,7 @@
 		"vscode": "^1.91.0"
 	},
 	"browser": "./dist/extension.js",
+	"enabledApiProposals": ["fileSearchProvider", "textSearchProvider"],
 	"activationEvents": [
 		"onFileSystem:memfs",
 		"onFileSystem:idbfs",

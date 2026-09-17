@@ -118,11 +118,19 @@ export class LocalFS {
 		return new Uint8Array(await file.arrayBuffer());
 	}
 
+	/** Metadata, not a read: these are real files, so a search can skip the big ones cheaply. */
+	async fileSize(p: string): Promise<number> {
+		const entry = await this.resolveEntry(p);
+		if (entry.kind !== 'file') throw new FileIsADirectory(p);
+		return (await entry.getFile()).size;
+	}
+
+	/** True when the file was created, which a watcher for new files needs told apart from a change. */
 	async writeFile(
 		p: string,
 		content: Uint8Array,
 		options: { create: boolean; overwrite: boolean }
-	): Promise<void> {
+	): Promise<boolean> {
 		const parts = splitPath(p);
 		const name = parts.pop();
 		if (!name) throw new FileNotFound(p);
@@ -142,6 +150,7 @@ export class LocalFS {
 		const writable = await handle.createWritable();
 		await writable.write(content);
 		await writable.close();
+		return existing === undefined;
 	}
 
 	async createDirectory(p: string): Promise<void> {

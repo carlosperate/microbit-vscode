@@ -16,6 +16,12 @@ describe('IdbFS', () => {
 		expect(dec(await fs.readFile('/a.txt'))).toBe('hi');
 	});
 
+	it('writeFile says whether it created the file, which decides the event a watcher sees', async () => {
+		const fs = new IdbFS(uniqueDb());
+		expect(await fs.writeFile('/a.txt', enc('hi'), { create: true, overwrite: true })).toBe(true);
+		expect(await fs.writeFile('/a.txt', enc('again'), { create: true, overwrite: true })).toBe(false);
+	});
+
 	it('persists across instances (close + reopen)', async () => {
 		const dbName = uniqueDb();
 		const fs1 = new IdbFS(dbName);
