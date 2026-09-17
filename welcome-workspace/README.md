@@ -31,7 +31,7 @@ To switch: open the Command Palette (`Ctrl/Cmd-Shift-P` or `F1`) and run
 3. Select the action you'd like to perform: Flash the programme, save the hex,
   or connect to the serial terminal.
 
-![Screenshot](https://raw.githubusercontent.com/carlosperate/vscode-microbit-micropython/main/assets/screenshot.png)
+![Screenshot](https://raw.githubusercontent.com/carlosperate/vscode-microbit-micropython/main/assets/screenshot_old.png)
 
 ## Learn more
 
