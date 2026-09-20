@@ -12,7 +12,8 @@
     "build:local-extensions": "node build-scripts/build-local-extensions.mjs",
     "fetch:openvsx-extensions": "node build-scripts/fetch-openvsx.mjs",
     "check:extensions": "node build-scripts/fetch-openvsx.mjs --check",
-    "dev": "sirv dist --port 8080 --single --dev",
+    "dev": "node build-scripts/dev-server.mjs",
+    "dev:serve": "node build-scripts/dev-server.mjs --no-browser",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rimraf .cache dist"
@@ -27,7 +28,7 @@
     "fake-indexeddb": "^6.2.5",
     "rimraf": "^5.0.5",
     "semver": "^7.8.1",
-    "sirv-cli": "^2.0.2",
+    "sirv": "^2.0.4",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0",
     "yauzl": "^3.1.3"
