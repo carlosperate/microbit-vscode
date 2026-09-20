@@ -1,7 +1,7 @@
 [
-	{ "publisher": "carlosperate", "name": "bbcmicrobit-cpp", "version": "0.2.0", "license": "MIT" },
-	{ "publisher": "carlosperate", "name": "bbcmicrobit-manager", "version": "0.1.0", "license": "MIT" },
-	{ "publisher": "carlosperate", "name": "bbcmicrobit-micropython", "version": "0.3.0", "license": "MIT" },
+	{ "publisher": "carlosperate", "name": "bbcmicrobit-cpp", "version": "0.3.0", "license": "MIT" },
+	{ "publisher": "carlosperate", "name": "bbcmicrobit-manager", "version": "0.2.0", "license": "MIT" },
+	{ "publisher": "carlosperate", "name": "bbcmicrobit-micropython", "version": "0.4.0", "license": "MIT" },
 	{ "publisher": "carlosperate", "name": "microbit-themes", "version": "0.1.0", "license": "MIT" },
 	{ "publisher": "carlosperate", "name": "micropython-lsp", "version": "0.4.0", "license": "MIT" },
 	{ "publisher": "ms-vscode", "name": "cpptools-themes", "version": "2.0.0", "license": "MIT" },
