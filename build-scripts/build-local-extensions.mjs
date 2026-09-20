@@ -11,6 +11,7 @@ const distExtensionsDir = path.join(root, 'dist', 'extensions');
 // `esbuild.config.mjs` that exports `getBuildOptions()` or can build itself.
 const localExtensions = [
 	path.join(srcExtensionsDir, 'workspace-storage'),
+	path.join(srcExtensionsDir, 'sidebar-actions'),
 ];
 
 /**

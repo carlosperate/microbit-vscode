@@ -1,0 +1,49 @@
+{
+	"name": "microbit-ide-sidebar-actions",
+	"displayName": "micro:bit IDE Sidebar Actions",
+	"description": "Sidebar buttons for the micro:bit Web IDE.",
+	"publisher": "carlosperate",
+	"version": "0.1.0",
+	"private": true,
+	"scripts": {
+		"build": "node esbuild.config.mjs"
+	},
+	"engines": {
+		"vscode": "^1.91.0"
+	},
+	"browser": "./dist/extension.js",
+	"activationEvents": [
+		"onStartupFinished"
+	],
+	"contributes": {
+		"commands": [
+			{
+				"command": "microbitIde.sidebarActions.buildAndFlash",
+				"title": "micro:bit IDE: Build & flash project"
+			},
+			{
+				"command": "microbitIde.sidebarActions.openSerialTerminal",
+				"title": "micro:bit IDE: Open serial terminal"
+			},
+			{
+				"command": "microbitIde.sidebarActions.showAllActions",
+				"title": "micro:bit IDE: Show all actions"
+			}
+		],
+		"views": {
+			"explorer": [
+				{
+					"id": "microbitIde.sidebarActions",
+					"name": "micro:bit IDE",
+					"visibility": "visible"
+				}
+			]
+		},
+		"viewsWelcome": [
+			{
+				"view": "microbitIde.sidebarActions",
+				"contents": "[Build & flash project](command:microbitIde.sidebarActions.buildAndFlash)\n[Open serial terminal](command:microbitIde.sidebarActions.openSerialTerminal)\n​[Show all actions](command:microbitIde.sidebarActions.showAllActions)"
+			}
+		]
+	}
+}
