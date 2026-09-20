@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { fetchAndUnpackExtensions } from './fetch-openvsx.mjs';
 import { buildLocalExtensions } from './build-local-extensions.mjs';
 import { fetchVscodeWeb } from './fetch-vscode-web.mjs';
+import { profileFromLayout } from './layout-profile.mjs';
 import { stripExternalSourceMappingUrls } from './strip-sourcemap-urls.mjs';
 import {
 	patchWebviewOriginCheck,
@@ -19,6 +20,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dist = path.join(root, 'dist');
 const publicDir = path.join(root, 'public');
 const productTemplate = path.join(root, 'config', 'product.template.json');
+const layoutConfig = path.join(root, 'config', 'layout.config.json');
 
 /**
  * Pick the vscode-web bundle to build against.
@@ -198,6 +200,10 @@ async function writeProductJson(vscodeWebVersion, extensionRefs, enabledApiPropo
 		...(product.additionalBuiltinExtensions ?? []),
 		...extensionRefs,
 	];
+	// `index.html` spreads product.json into the workbench options, so the seeded
+	// layout reaches VS Code as the `profile` option without any code there.
+	const profile = profileFromLayout(JSON.parse(await readFile(layoutConfig, 'utf8')));
+	if (profile) product.profile = profile;
 	await writeFile(path.join(dist, 'product.json'), JSON.stringify(product, null, '\t') + '\n');
 }
 
