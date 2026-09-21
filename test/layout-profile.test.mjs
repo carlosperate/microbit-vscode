@@ -12,8 +12,7 @@ describe('profileFromLayout', () => {
 		expect(profileFromLayout({ activityBar: [], explorerViews: [] })).toBeUndefined();
 	});
 
-	// Naming it anything else makes VS Code treat it as a non-default profile and
-	// badge the Manage gear and the window title with the name.
+	// Other names add profile badges to the gear and window title.
 	it('names the profile Default so no profile UI appears', () => {
 		const option = profileFromLayout({ activityBar: [{ id: 'a' }] });
 		expect(option.name).toBe('Default');
@@ -59,6 +58,29 @@ describe('profileFromLayout', () => {
 		]);
 	});
 
+	it('suppresses startup expansion for hidden sidebar actions without losing other extension state', () => {
+		const storage = storageOf(profileFromLayout({
+			explorerViews: [{ id: 'microbitIde.sidebarActions', hidden: true }],
+			extensionState: {
+				'carlosperate.microbit-ide-sidebar-actions': {
+					'microbitIde.sidebarActions.expandedOnce': false,
+					other: 'preserved',
+				},
+			},
+		}));
+		expect(JSON.parse(storage['carlosperate.microbit-ide-sidebar-actions'])).toEqual({
+			'microbitIde.sidebarActions.expandedOnce': true,
+			other: 'preserved',
+		});
+	});
+
+	it.each([undefined, false])('keeps startup expansion for shown sidebar actions (hidden: %s)', (hidden) => {
+		const storage = storageOf(profileFromLayout({
+			explorerViews: [{ id: 'microbitIde.sidebarActions', hidden }],
+		}));
+		expect(storage['carlosperate.microbit-ide-sidebar-actions']).toBeUndefined();
+	});
+
 	describe('view containers', () => {
 		const layout = {
 			viewContainers: [
@@ -80,8 +102,7 @@ describe('profileFromLayout', () => {
 			expect(customizations.viewContainerBadgeEnablementStates).toEqual({});
 		});
 
-		// Without this the views land in the container in registration order,
-		// which is whatever order the extensions happened to activate in.
+		// Activation order must not decide the view order.
 		it('pins the order of the views inside the container', () => {
 			const storage = storageOf(profileFromLayout(layout));
 			expect(JSON.parse(storage['workbench.view.extension.bbcmicrobit.state.hidden'])).toEqual([
@@ -108,8 +129,7 @@ describe('profileFromLayout', () => {
 		]);
 	});
 
-	// The template format nests JSON inside JSON inside JSON; getting a layer
-	// wrong reads as "the seed silently did nothing".
+	// A missing JSON layer makes the workbench silently ignore the seed.
 	it('stringifies every layer the template expects', () => {
 		const option = profileFromLayout({ activityBar: [{ id: 'a' }] });
 		expect(typeof option.contents).toBe('string');

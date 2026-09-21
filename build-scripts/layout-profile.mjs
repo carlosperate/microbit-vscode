@@ -1,14 +1,9 @@
 /**
- * Turns `config/layout.config.json` into the workbench's `profile` construction
- * option.
- *
- * The workbench keeps its layout in profile-scoped storage, and a profile
- * template is the supported way in. VS Code applies one only while that storage
- * is new, so a user's own arrangement is never overwritten.
+ * VS Code applies profile templates only to new profile storage,
+ * preserving any layout changes the user has already made.
  */
 
-// Anything else reads as a non-default profile, which badges the Manage gear
-// and the window title with the name.
+// Other names add profile badges to the gear and window title.
 const PROFILE_NAME = 'Default';
 
 const ACTIVITY_BAR_KEY = 'workbench.activity.pinnedViewlets2';
@@ -24,15 +19,13 @@ export function profileFromLayout(layout) {
 		);
 	}
 
-	// `isHidden` travels with the order: it is the same stored entry.
 	if (layout?.explorerViews?.length) {
 		storage[EXPLORER_VIEWS_KEY] = JSON.stringify(
 			layout.explorerViews.map((view, order) => ({ id: view.id, isHidden: view.hidden === true, order }))
 		);
 	}
 
-	// Moving a view between containers is what the manager's Combine button does;
-	// `views.customizations` is where the workbench records it.
+	// Seed the same view locations that the manager's Combine button records.
 	if (layout?.viewContainers?.length) {
 		const viewLocations = {};
 		for (const container of layout.viewContainers) {
@@ -48,9 +41,16 @@ export function profileFromLayout(layout) {
 		});
 	}
 
-	// An extension's own `globalState`, so a seeded layout and the extension's
-	// idea of it agree. Keyed by extension id, exactly as the workbench stores it.
-	for (const [extensionId, state] of Object.entries(layout?.extensionState ?? {})) {
+	const extensionState = { ...layout?.extensionState };
+	// The sidebar's startup focus command would otherwise reveal a hidden view.
+	if (layout?.explorerViews?.some((view) => view.id === 'microbitIde.sidebarActions' && view.hidden === true)) {
+		extensionState['carlosperate.microbit-ide-sidebar-actions'] = {
+			...extensionState['carlosperate.microbit-ide-sidebar-actions'],
+			'microbitIde.sidebarActions.expandedOnce': true,
+		};
+	}
+	// Keep each extension's globalState consistent with the seeded layout.
+	for (const [extensionId, state] of Object.entries(extensionState)) {
 		storage[extensionId] = JSON.stringify(state);
 	}
 

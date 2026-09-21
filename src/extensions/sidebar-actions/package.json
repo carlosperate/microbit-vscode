@@ -1,6 +1,6 @@
 {
 	"name": "microbit-ide-sidebar-actions",
-	"displayName": "micro:bit IDE Sidebar Actions",
+	"displayName": "BBC micro:bit IDE Sidebar Actions",
 	"description": "Sidebar buttons for the micro:bit Web IDE.",
 	"publisher": "carlosperate",
 	"version": "0.1.0",
@@ -19,22 +19,46 @@
 		"commands": [
 			{
 				"command": "microbitIde.sidebarActions.buildAndFlash",
-				"title": "micro:bit IDE: Build & flash project"
+				"title": "BBC micro:bit IDE: Build & flash project"
 			},
 			{
 				"command": "microbitIde.sidebarActions.openSerialTerminal",
-				"title": "micro:bit IDE: Open serial terminal"
+				"title": "BBC micro:bit IDE: Open serial terminal"
 			},
 			{
 				"command": "microbitIde.sidebarActions.showAllActions",
-				"title": "micro:bit IDE: Show all actions"
+				"title": "BBC micro:bit IDE: Show all actions"
+			},
+			{
+				"command": "microbitIde.sidebarActions.createProject",
+				"title": "BBC micro:bit IDE: Create new project"
 			}
 		],
+		"configuration": {
+			"title": "BBC micro:bit IDE",
+			"properties": {
+				"microbitIde.projectLanguage": {
+					"type": "string",
+					"enum": [
+						"auto",
+						"micropython",
+						"cpp"
+					],
+					"enumDescriptions": [
+						"Decide from the files in the workspace, and ask when they are inconclusive.",
+						"Always build this project with the MicroPython extension.",
+						"Always build this project with the C++ extension."
+					],
+					"default": "auto",
+					"description": "Which language the BBC micro:bit IDE's Build & flash button builds the project with."
+				}
+			}
+		},
 		"views": {
 			"explorer": [
 				{
 					"id": "microbitIde.sidebarActions",
-					"name": "micro:bit IDE",
+					"name": "BBC micro:bit IDE",
 					"visibility": "visible"
 				}
 			]
@@ -42,7 +66,7 @@
 		"viewsWelcome": [
 			{
 				"view": "microbitIde.sidebarActions",
-				"contents": "[Build & flash project](command:microbitIde.sidebarActions.buildAndFlash)\n[Open serial terminal](command:microbitIde.sidebarActions.openSerialTerminal)\n​[Show all actions](command:microbitIde.sidebarActions.showAllActions)"
+				"contents": "[$(zap) Build & flash project](command:microbitIde.sidebarActions.buildAndFlash)\n[$(terminal) Open serial terminal](command:microbitIde.sidebarActions.openSerialTerminal)\n[Create new project](command:microbitIde.sidebarActions.createProject) · [Show all actions](command:microbitIde.sidebarActions.showAllActions)"
 			}
 		]
 	}
