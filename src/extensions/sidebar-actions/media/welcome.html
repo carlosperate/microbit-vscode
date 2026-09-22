@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-{{nonce}}'; script-src 'nonce-{{nonce}}';" />
+		<title>Welcome</title>
+		<style nonce="{{nonce}}">
+			:root {
+				--ink: var(--vscode-foreground);
+				--muted: var(--vscode-descriptionForeground);
+				--card: var(--vscode-editorWidget-background, rgba(127, 127, 127, 0.08));
+				--line: var(--vscode-widget-border, rgba(127, 127, 127, 0.35));
+				--accent-a: var(--vscode-charts-blue);
+				--accent-b: var(--vscode-charts-purple);
+				--accent-c: var(--vscode-charts-green);
+				--arrow: var(--vscode-charts-purple);
+				/* The board is a real object: black PCB, gold contacts, red LEDs. */
+				--pcb: #141414;
+				--pcb-edge: #2c2c2c;
+				--gold: #d9a521;
+				--gold-dark: #a87c12;
+				--silver: #b8bcc4;
+				--led: var(--vscode-charts-red);
+			}
+
+			* { box-sizing: border-box; }
+
+			body {
+				margin: 0;
+				padding: 0 24px 64px;
+				font-family: var(--vscode-font-family);
+				font-size: var(--vscode-font-size, 13px);
+				color: var(--ink);
+				background: var(--vscode-editor-background);
+			}
+
+			.wrap { max-width: 960px; margin: 0 auto; }
+
+			.hero { padding: 42px 0 8px; text-align: center; }
+			.hero h1 {
+				margin: 0;
+				font-size: 38px;
+				line-height: 1.15;
+				letter-spacing: -0.02em;
+				background: linear-gradient(100deg, var(--vscode-statusBar-background), var(--vscode-button-background));
+				-webkit-background-clip: text;
+				background-clip: text;
+				color: transparent;
+			}
+			.hero p { margin: 14px auto 0; max-width: 34em; font-size: 15px; color: var(--muted); }
+
+			.cue { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 26px; }
+			.cue span { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+			.cue svg { width: 46px; height: 58px; }
+			.cue .shaft, .cue .head { stroke: url(#cueGrad); fill: none; stroke-width: 7; stroke-linecap: round; stroke-linejoin: round; }
+			.cue g { animation: nudge 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+			@keyframes nudge {
+				0%, 100% { transform: translateY(0); opacity: 0.85; }
+				50% { transform: translateY(9px); opacity: 1; }
+			}
+
+			/* Accordion */
+			.step {
+				margin-top: 12px;
+				border: 1px solid var(--line);
+				border-radius: 14px;
+				background: var(--card);
+			}
+			.step summary {
+				list-style: none;
+				display: flex;
+				align-items: center;
+				gap: 12px;
+				padding: 16px 22px;
+				font-size: 18px;
+				font-weight: 600;
+				cursor: pointer;
+				border-radius: 14px;
+			}
+			.step summary::-webkit-details-marker { display: none; }
+			.step summary:hover { background: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.1)); }
+			.step summary:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: -2px; }
+			.step[open] summary { border-radius: 14px 14px 0 0; }
+			.chevron {
+				margin-left: auto;
+				width: 10px;
+				height: 10px;
+				border-right: 2px solid var(--muted);
+				border-bottom: 2px solid var(--muted);
+				transform: rotate(-45deg);
+				transition: transform 0.2s;
+				flex: none;
+			}
+			.step[open] .chevron { transform: rotate(45deg); }
+			.badge {
+				flex: none;
+				width: 30px;
+				height: 30px;
+				border-radius: 50%;
+				display: grid;
+				place-items: center;
+				font-size: 14px;
+				font-weight: 700;
+				color: var(--vscode-statusBar-foreground);
+				background: var(--vscode-statusBar-background);
+			}
+			.body {
+				display: grid;
+				grid-template-columns: 1fr 300px;
+				gap: 28px;
+				align-items: center;
+				padding: 4px 22px 4px;
+			}
+			.body p { margin: 0 0 14px; color: var(--muted); line-height: 1.55; }
+			code {
+				font-family: var(--vscode-editor-font-family, monospace);
+				color: var(--vscode-textPreformat-foreground, inherit);
+				background: var(--vscode-textPreformat-background, transparent);
+				padding: 1px 4px;
+				border-radius: 3px;
+			}
+			.body figure { margin: 0; }
+			.body svg.art { width: 100%; height: auto; display: block; }
+
+			.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+			button {
+				font-family: inherit;
+				font-size: 13px;
+				padding: 8px 15px;
+				border: 1px solid var(--vscode-button-border, transparent);
+				border-radius: 5px;
+				color: var(--vscode-button-foreground);
+				background: var(--vscode-button-background);
+				cursor: pointer;
+			}
+			button:hover { background: var(--vscode-button-hoverBackground); }
+			button.ghost {
+				color: var(--vscode-button-secondaryForeground);
+				background: var(--vscode-button-secondaryBackground);
+			}
+			button.ghost:hover { background: var(--vscode-button-secondaryHoverBackground); }
+			button:focus-visible { outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px; }
+
+			.themes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+			.themes button { display: flex; align-items: center; gap: 8px; justify-content: flex-start; }
+			/* Each dot is that theme's own button colour, ringed with its editor background. */
+			.themes .dot { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--line); flex: none; }
+			.themes .pixel-light .dot { background: #00a000; border-color: #fafbf7; }
+			.themes .pixel-dark .dot { background: #8ac9a0; border-color: #0f1815; }
+			.themes .spark-light .dot { background: #cd0365; border-color: #fefaf6; }
+			.themes .spark-dark .dot { background: #f08aa8; border-color: #1c0e0b; }
+			.themes .halo-light .dot { background: #6c4bc1; border-color: #faf8fd; }
+			.themes .halo-dark .dot { background: #b4a3e8; border-color: #13101f; }
+
+			.foot { margin-top: 30px; text-align: center; color: var(--muted); font-size: 12px; }
+
+			@media (max-width: 720px) {
+				.body { grid-template-columns: 1fr; }
+				.hero h1 { font-size: 30px; }
+				.themes { grid-template-columns: 1fr 1fr; }
+			}
+
+			.pulse { animation: breathe 3.4s ease-in-out infinite; }
+			@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+
+			@media (prefers-reduced-motion: reduce) {
+				.cue g, .pulse { animation: none; }
+				.chevron { transition: none; }
+			}
+		</style>
+	</head>
+	<body>
+		<svg width="0" height="0" aria-hidden="true">
+			<defs>
+				<!-- userSpaceOnUse: a straight line has a zero-area bounding box, and an
+				     objectBoundingBox gradient on one paints nothing at all. -->
+				<linearGradient id="cueGrad" gradientUnits="userSpaceOnUse" x1="23" y1="4" x2="23" y2="50">
+					<stop offset="0" stop-color="var(--accent-a)" />
+					<stop offset="1" stop-color="var(--accent-b)" />
+				</linearGradient>
+				<!-- A micro:bit V2 at its real 52:42 proportions, drawn flat: LEDs straight on
+				     the PCB, silver-based buttons, a thin pinned connector, no gradients. -->
+				<symbol id="microbit" viewBox="-4 -10 128 108">
+					<pattern id="pins" width="3.4" height="17" patternUnits="userSpaceOnUse">
+						<rect x="0.95" width="1.5" height="17" fill="var(--gold)" />
+					</pattern>
+
+					<rect x="52.5" y="-6.5" width="15" height="7" rx="1.5" fill="#b9bec6" stroke="#0b0b0b" stroke-width="1.2" />
+					<rect x="55.5" y="-4" width="9" height="2.2" rx="0.8" fill="#4d525a" />
+					<rect x="0" y="0" width="120" height="97" rx="5" fill="#1c1f24" stroke="#000000" stroke-width="2" />
+
+					<circle cx="44" cy="8.5" r="2" fill="#0a0a0a" stroke="#3b414a" stroke-width="0.8" />
+					<circle cx="49.5" cy="6.2" r="0.9" fill="var(--led)" />
+					<rect x="53" y="4.5" width="14" height="7.5" rx="3.75" fill="none" stroke="var(--gold)" stroke-width="1.7" />
+					<circle cx="57.4" cy="8.25" r="1.25" fill="var(--gold)" />
+					<circle cx="62.6" cy="8.25" r="1.25" fill="var(--gold)" />
+					<rect x="26" y="6" width="4" height="2.6" rx="0.6" fill="#3b414a" />
+					<rect x="84" y="6" width="5" height="2.6" rx="0.6" fill="#3b414a" />
+					<rect x="91" y="6" width="3" height="2.6" rx="0.6" fill="#3b414a" />
+
+					<g fill="var(--led)">
+						<rect x="42.2" y="20" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="50.2" y="20" width="5.6" height="5.6" rx="1" />
+						<rect x="58.2" y="20" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="66.2" y="20" width="5.6" height="5.6" rx="1" />
+						<rect x="74.2" y="20" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="42.2" y="28" width="5.6" height="5.6" rx="1" />
+						<rect x="50.2" y="28" width="5.6" height="5.6" rx="1" />
+						<rect x="58.2" y="28" width="5.6" height="5.6" rx="1" />
+						<rect x="66.2" y="28" width="5.6" height="5.6" rx="1" />
+						<rect x="74.2" y="28" width="5.6" height="5.6" rx="1" />
+						<rect x="42.2" y="36" width="5.6" height="5.6" rx="1" />
+						<rect x="50.2" y="36" width="5.6" height="5.6" rx="1" />
+						<rect x="58.2" y="36" width="5.6" height="5.6" rx="1" />
+						<rect x="66.2" y="36" width="5.6" height="5.6" rx="1" />
+						<rect x="74.2" y="36" width="5.6" height="5.6" rx="1" />
+						<rect x="42.2" y="44" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="50.2" y="44" width="5.6" height="5.6" rx="1" />
+						<rect x="58.2" y="44" width="5.6" height="5.6" rx="1" />
+						<rect x="66.2" y="44" width="5.6" height="5.6" rx="1" />
+						<rect x="74.2" y="44" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="42.2" y="52" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="50.2" y="52" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="58.2" y="52" width="5.6" height="5.6" rx="1" />
+						<rect x="66.2" y="52" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+						<rect x="74.2" y="52" width="5.6" height="5.6" rx="1" fill-opacity="0.14" />
+					</g>
+
+					<rect x="6" y="33" width="13" height="13" rx="1.5" fill="#aeb4bd" />
+					<rect x="8" y="35" width="9" height="9" rx="1" fill="#3b414a" />
+					<circle cx="12.5" cy="39.5" r="3.4" fill="#0a0a0a" />
+					<circle cx="11.4" cy="38.4" r="1" fill="#ffffff" fill-opacity="0.25" />
+					<text x="9.8" y="55.5" font-family="system-ui, sans-serif" font-size="6.5" font-weight="700" fill="#e9ecf1">A</text>
+					<rect x="101" y="33" width="13" height="13" rx="1.5" fill="#aeb4bd" />
+					<rect x="103" y="35" width="9" height="9" rx="1" fill="#3b414a" />
+					<circle cx="107.5" cy="39.5" r="3.4" fill="#0a0a0a" />
+					<circle cx="106.4" cy="38.4" r="1" fill="#ffffff" fill-opacity="0.25" />
+					<text x="104.6" y="55.5" font-family="system-ui, sans-serif" font-size="6.5" font-weight="700" fill="#e9ecf1">B</text>
+
+					<text x="7" y="72.5" font-family="system-ui, sans-serif" font-size="6.5" font-weight="700" fill="#e9ecf1">micro:bit</text>
+
+					<rect x="0" y="80" width="120" height="17" fill="#111318" />
+					<rect x="0" y="80" width="120" height="17" fill="url(#pins)" />
+					<g fill="var(--gold)">
+						<rect x="4.5" y="80.5" width="11" height="16.5" rx="1.2" /><circle cx="10" cy="90" r="2.7" fill="#111318" />
+						<rect x="29.5" y="80.5" width="11" height="16.5" rx="1.2" /><circle cx="35" cy="90" r="2.7" fill="#111318" />
+						<rect x="54.5" y="80.5" width="11" height="16.5" rx="1.2" /><circle cx="60" cy="90" r="2.7" fill="#111318" />
+						<rect x="79.5" y="80.5" width="11" height="16.5" rx="1.2" /><circle cx="85" cy="90" r="2.7" fill="#111318" />
+						<rect x="104.5" y="80.5" width="11" height="16.5" rx="1.2" /><circle cx="110" cy="90" r="2.7" fill="#111318" />
+					</g>
+					<g font-family="system-ui, sans-serif" font-size="4.6" font-weight="700" fill="var(--gold)">
+						<text x="8.6" y="78.6">0</text><text x="33.6" y="78.6">1</text><text x="58.6" y="78.6">2</text><text x="81.4" y="78.6">3V</text><text x="104.2" y="78.6">GND</text>
+					</g>
+				</symbol>
+			</defs>
+		</svg>
+
+		<div class="wrap">
+			<header class="hero">
+				<h1>Welcome to the BBC micro:bit IDE</h1>
+				<p>Write code, send it to a BBC micro:bit, and watch it run. MicroPython or C++ projects, all in the browser.</p>
+				<div class="cue">
+					<span>Explore these 5 IDE features</span>
+					<svg viewBox="0 0 46 58" aria-hidden="true">
+						<g>
+							<path class="shaft" d="M23 6v38" />
+							<path class="head" d="M10 33l13 13 13-13" />
+						</g>
+					</svg>
+				</div>
+			</header>
+
+			<details class="step" name="steps" open>
+				<summary><span class="badge">1</span>Open or create a project<span class="chevron"></span></summary>
+				<div class="body">
+					<div>
+						<p>
+							This is a small starter project, with <code>main.py</code> ready to edit in the Explorer. To work on your own code,
+							open a folder from your computer or start a fresh MicroPython or C++ project.
+						</p>
+						<div class="actions">
+							<button data-command="microbitIde.openLocalFolder">Open a folder on your computer</button>
+							<button class="ghost" data-command="microbitIde.sidebarActions.createProject">Create a new project</button>
+						</div>
+					</div>
+					<figure>
+						<svg class="art" viewBox="0 0 300 180" role="img" aria-label="An editor showing main.py beside a micro:bit board.">
+							<rect width="300" height="180" rx="10" fill="var(--vscode-editor-background)" />
+							<rect x="6" y="14" width="150" height="152" rx="8" fill="var(--vscode-editorWidget-background, rgba(127,127,127,0.1))" stroke="var(--line)" />
+							<rect x="6" y="14" width="150" height="24" rx="8" fill="var(--vscode-editorGroupHeader-tabsBackground, rgba(127,127,127,0.15))" />
+							<rect x="6" y="30" width="150" height="8" fill="var(--vscode-editorGroupHeader-tabsBackground, rgba(127,127,127,0.15))" />
+							<rect x="14" y="14" width="60" height="24" fill="var(--vscode-tab-activeBackground, transparent)" />
+							<rect x="14" y="14" width="60" height="2.5" fill="var(--accent-a)" />
+							<text x="22" y="31" font-size="9" fill="var(--ink)">main.py</text>
+							<rect x="18" y="52" width="44" height="7" rx="3.5" fill="var(--vscode-charts-purple)" />
+							<rect x="66" y="52" width="60" height="7" rx="3.5" fill="var(--vscode-charts-blue)" />
+							<rect x="18" y="70" width="32" height="7" rx="3.5" fill="var(--vscode-charts-purple)" />
+							<rect x="30" y="88" width="56" height="7" rx="3.5" fill="var(--vscode-charts-yellow)" />
+							<rect x="90" y="88" width="46" height="7" rx="3.5" fill="var(--vscode-charts-orange)" />
+							<rect x="30" y="106" width="40" height="7" rx="3.5" fill="var(--vscode-charts-yellow)" />
+							<rect x="74" y="106" width="30" height="7" rx="3.5" fill="var(--vscode-charts-green)" />
+							<rect x="18" y="124" width="50" height="7" rx="3.5" fill="var(--vscode-charts-purple)" />
+							<path d="M164 90h16" stroke="var(--arrow)" stroke-width="5" stroke-linecap="round" />
+							<path d="M178 82l12 8-12 8z" fill="var(--arrow)" />
+							<use href="#microbit" x="192" y="36" width="104" height="94" />
+						</svg>
+					</figure>
+				</div>
+			</details>
+
+			<details class="step" name="steps">
+				<summary><span class="badge">2</span>Send it to the micro:bit<span class="chevron"></span></summary>
+				<div class="body">
+					<div>
+						<p>
+							Plug the micro:bit in over USB and press Build &amp; flash. It uses WebUSB, so you need a Chrome-based
+							browser such as Chrome or Edge. Pair once, when asked, and every flash after that goes straight through.
+						</p>
+						<div class="actions">
+							<button data-command="microbitIde.sidebarActions.buildAndFlash">Build &amp; flash project</button>
+						</div>
+					</div>
+					<figure>
+						<svg class="art" viewBox="0 0 300 180" role="img" aria-label="A laptop joined by a USB cable to a micro:bit board.">
+							<rect width="300" height="180" rx="10" fill="var(--vscode-editor-background)" />
+							<rect x="18" y="50" width="108" height="70" rx="6" fill="var(--vscode-editorWidget-background, rgba(127,127,127,0.1))" stroke="var(--line)" stroke-width="2" />
+							<rect x="26" y="58" width="92" height="54" rx="3" fill="var(--vscode-editor-background)" />
+							<rect x="34" y="68" width="36" height="6" rx="3" fill="var(--vscode-charts-purple)" />
+							<rect x="74" y="68" width="34" height="6" rx="3" fill="var(--vscode-charts-blue)" />
+							<rect x="42" y="82" width="44" height="6" rx="3" fill="var(--vscode-charts-yellow)" />
+							<rect x="90" y="82" width="20" height="6" rx="3" fill="var(--vscode-charts-orange)" />
+							<rect x="42" y="96" width="30" height="6" rx="3" fill="var(--vscode-charts-green)" />
+							<rect x="6" y="120" width="132" height="9" rx="4" fill="var(--line)" />
+							<path d="M126 84 C 160 84, 196 28, 231 40" fill="none" stroke="var(--arrow)" stroke-width="4" stroke-linecap="round" />
+							<path d="M158 70l10 -6-2 11z" fill="var(--arrow)" />
+							<use href="#microbit" x="168" y="40" width="126" height="114" />
+						</svg>
+					</figure>
+				</div>
+			</details>
+
+			<details class="step" name="steps">
+				<summary><span class="badge">3</span>Watch it run<span class="chevron"></span></summary>
+				<div class="body">
+					<div>
+						<p>
+							No board to hand? The MicroPython simulator runs your code in the browser. On real hardware, whatever your
+							program prints, and every error, comes back over the serial terminal.
+						</p>
+						<div class="actions">
+							<button data-command="bbcmicrobit-micropython.openSimulator">Open the simulator</button>
+							<button class="ghost" data-command="microbitIde.sidebarActions.openSerialTerminal">Open serial terminal</button>
+						</div>
+					</div>
+					<figure>
+						<svg class="art" viewBox="0 0 300 180" role="img" aria-label="A serial monitor showing printed output and a Python error.">
+							<rect width="300" height="180" rx="10" fill="var(--vscode-editor-background)" />
+							<rect x="10" y="24" width="280" height="132" rx="10" fill="var(--vscode-panel-background, rgba(127,127,127,0.1))" stroke="var(--line)" />
+							<text x="26" y="50" font-size="9" letter-spacing="0.6" fill="var(--ink)">SERIAL MONITOR</text>
+							<rect x="24" y="56" width="96" height="2.5" rx="1.2" fill="var(--accent-b)" />
+							<circle cx="270" cy="45" r="4.5" fill="var(--vscode-charts-green)" class="pulse" />
+							<text x="26" y="86" font-size="11" font-family="monospace" fill="var(--ink)">Hello, micro:bit!</text>
+							<text x="26" y="106" font-size="11" font-family="monospace" fill="var(--ink)">temperature: 21</text>
+							<text x="26" y="130" font-size="11" font-family="monospace" fill="var(--vscode-errorForeground)">Traceback (most recent call last):</text>
+							<text x="26" y="148" font-size="11" font-family="monospace" fill="var(--vscode-errorForeground)">  NameError: 'dispaly'</text>
+						</svg>
+					</figure>
+				</div>
+			</details>
+
+			<details class="step" name="steps">
+				<summary><span class="badge">4</span>Keep what you make<span class="chevron"></span></summary>
+				<div class="body">
+					<div>
+						<p>
+							Files in this tab vanish when you close it. Switching storage opens a fresh workspace rather than moving
+							files, so pick browser storage or a folder on your computer before you start anything you want to keep.
+						</p>
+						<div class="actions">
+							<button data-command="microbitIde.switchStorage">Switch workspace storage</button>
+						</div>
+					</div>
+					<figure>
+						<svg class="art" viewBox="0 0 300 180" role="img" aria-label="A main.py file being saved into a folder, marked with a tick.">
+							<rect width="300" height="180" rx="10" fill="var(--vscode-editor-background)" />
+							<path d="M62 34h50l22 22v82a6 6 0 0 1-6 6H62a6 6 0 0 1-6-6V40a6 6 0 0 1 6-6z" fill="var(--vscode-editorWidget-background, rgba(127,127,127,0.1))" stroke="var(--line)" stroke-width="2" />
+							<path d="M112 34v22h22" fill="none" stroke="var(--line)" stroke-width="2" />
+							<text x="68" y="76" font-size="10" font-weight="600" fill="var(--ink)">main.py</text>
+							<rect x="68" y="88" width="34" height="6" rx="3" fill="var(--vscode-charts-purple)" />
+							<rect x="68" y="102" width="50" height="6" rx="3" fill="var(--vscode-charts-blue)" />
+							<rect x="76" y="116" width="40" height="6" rx="3" fill="var(--vscode-charts-yellow)" />
+							<path d="M148 92h30" stroke="var(--arrow)" stroke-width="6" stroke-linecap="round" />
+							<path d="M174 82l16 10-16 10z" fill="var(--arrow)" />
+							<path d="M198 62h32l8 10h50a6 6 0 0 1 6 6v58a6 6 0 0 1-6 6h-90a6 6 0 0 1-6-6V68a6 6 0 0 1 6-6z" fill="var(--vscode-charts-yellow)" />
+							<rect x="192" y="86" width="102" height="56" rx="6" fill="var(--vscode-charts-orange)" />
+							<circle cx="280" cy="134" r="17" fill="var(--vscode-charts-green)" stroke="var(--vscode-editor-background)" stroke-width="3" />
+							<path d="M271 134l6 6 12-13" fill="none" stroke="var(--vscode-editor-background)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+						</svg>
+					</figure>
+				</div>
+			</details>
+
+			<details class="step" name="steps">
+				<summary><span class="badge">5</span>Pick a look<span class="chevron"></span></summary>
+				<div class="body">
+					<div>
+						<p>Six micro:bit themes, three light and three dark. Change again any time from the Command Palette.</p>
+						<div class="themes">
+							<button class="ghost pixel-light" data-theme="micro:bit Pixel Light"><span class="dot"></span>Pixel Light</button>
+							<button class="ghost spark-light" data-theme="micro:bit Spark Light"><span class="dot"></span>Spark Light</button>
+							<button class="ghost halo-light" data-theme="micro:bit Halo Light"><span class="dot"></span>Halo Light</button>
+							<button class="ghost pixel-dark" data-theme="micro:bit Pixel Dark"><span class="dot"></span>Pixel Dark</button>
+							<button class="ghost spark-dark" data-theme="micro:bit Spark Dark"><span class="dot"></span>Spark Dark</button>
+							<button class="ghost halo-dark" data-theme="micro:bit Halo Dark"><span class="dot"></span>Halo Dark</button>
+						</div>
+					</div>
+					<figure>
+						<svg class="art" viewBox="0 0 300 180" role="img" aria-label="A small window drawn in the current theme colours.">
+							<rect width="300" height="180" rx="10" fill="var(--vscode-editor-background)" />
+							<rect x="30" y="24" width="240" height="132" rx="10" fill="var(--vscode-sideBar-background, var(--card))" stroke="var(--line)" />
+							<rect x="30" y="24" width="48" height="132" rx="10" fill="var(--vscode-activityBar-background, var(--card))" />
+							<rect x="42" y="42" width="24" height="24" rx="6" fill="var(--vscode-activityBar-foreground, var(--ink))" fill-opacity="0.85" />
+							<rect x="42" y="76" width="24" height="24" rx="6" fill="var(--vscode-activityBar-inactiveForeground, var(--muted))" fill-opacity="0.6" />
+							<rect x="78" y="24" width="192" height="26" fill="var(--vscode-editorGroupHeader-tabsBackground, var(--card))" />
+							<rect x="86" y="24" width="64" height="26" fill="var(--vscode-tab-activeBackground, var(--vscode-editor-background))" />
+							<rect x="86" y="24" width="64" height="2.5" fill="var(--vscode-tab-activeBorderTop, var(--vscode-focusBorder))" />
+							<rect x="78" y="50" width="192" height="106" fill="var(--vscode-editor-background)" />
+							<rect x="92" y="66" width="52" height="7" rx="3.5" fill="var(--vscode-charts-purple)" />
+							<rect x="150" y="66" width="70" height="7" rx="3.5" fill="var(--vscode-charts-blue)" />
+							<rect x="104" y="84" width="60" height="7" rx="3.5" fill="var(--vscode-charts-yellow)" />
+							<rect x="170" y="84" width="54" height="7" rx="3.5" fill="var(--vscode-charts-orange)" />
+							<rect x="104" y="102" width="44" height="7" rx="3.5" fill="var(--vscode-charts-yellow)" />
+							<rect x="154" y="102" width="34" height="7" rx="3.5" fill="var(--vscode-charts-green)" />
+							<rect x="92" y="120" width="76" height="7" rx="3.5" fill="var(--vscode-charts-purple)" />
+							<rect x="180" y="134" width="70" height="16" rx="4" fill="var(--vscode-button-background)" />
+						</svg>
+					</figure>
+				</div>
+			</details>
+
+			<p class="foot">Reopen this page any time from the Command Palette: <strong>BBC micro:bit IDE: Open the welcome page</strong>.</p>
+		</div>
+
+		<script nonce="{{nonce}}">
+			const vscode = acquireVsCodeApi();
+			for (const button of document.querySelectorAll('button[data-command]')) {
+				button.addEventListener('click', () => vscode.postMessage({ type: 'run', command: button.dataset.command }));
+			}
+			for (const button of document.querySelectorAll('button[data-theme]')) {
+				button.addEventListener('click', () => vscode.postMessage({ type: 'theme', theme: button.dataset.theme }));
+			}
+			// One open at a time, for browsers without exclusive <details name>. The open
+			// step is kept in webview state so hiding the tab does not reset it.
+			const steps = [...document.querySelectorAll('details.step')];
+			const saved = vscode.getState()?.open;
+			if (typeof saved === 'number' && steps[saved]) steps.forEach((s, i) => (s.open = i === saved));
+			for (const step of steps) {
+				step.addEventListener('toggle', () => {
+					if (!step.open) return;
+					for (const other of steps) if (other !== step) other.open = false;
+					vscode.setState({ open: steps.indexOf(step) });
+				});
+			}
+		</script>
+	</body>
+</html>

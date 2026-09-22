@@ -21,10 +21,8 @@ declare const __WELCOME_FILES__: ReadonlyArray<{ path: string; contents: string 
 
 type CoreFS = MemFS | IdbFS | LocalFS;
 
-const WELCOME_ROOT = '/welcome';
-const WELCOME_STARTER_PATH = 'main.py';
-const WELCOME_README_PATH = 'README.md';
-const WELCOME_SHOWN_KEY = 'microbit.welcomeShown';
+// The basename is what the Explorer shows as the pane title.
+const WELCOME_ROOT = '/Welcome workspace';
 
 function seedWelcome(memfs: MemFS): void {
 	try {
@@ -50,22 +48,6 @@ function seedWelcome(memfs: MemFS): void {
 			create: true,
 			overwrite: true,
 		});
-	}
-}
-
-async function showWelcomeTabs(context: vscode.ExtensionContext): Promise<void> {
-	if (context.globalState.get<boolean>(WELCOME_SHOWN_KEY)) return;
-	await context.globalState.update(WELCOME_SHOWN_KEY, true);
-	try {
-		const readmeUri = vscode.Uri.parse(`memfs:${WELCOME_ROOT}/${WELCOME_README_PATH}`);
-		await vscode.commands.executeCommand('markdown.showPreview', readmeUri);
-		const starterUri = vscode.Uri.parse(`memfs:${WELCOME_ROOT}/${WELCOME_STARTER_PATH}`);
-		await vscode.window.showTextDocument(starterUri, {
-			preview: false,
-			viewColumn: vscode.ViewColumn.Beside,
-		});
-	} catch (e: any) {
-		console.warn('[carlosperate.microbit-ide-workspace-storage] welcome auto-open failed:', e?.message ?? e);
 	}
 }
 
@@ -227,7 +209,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	// `esbuild.config.mjs`); memfs is wiped on every reload so this
 	// rewrites the full tree on each activation. Cheap, ~kb of data.
 	seedWelcome(memfs);
-	void showWelcomeTabs(context);
 
 	// Restore a previously-picked local folder handle BEFORE activation
 	// resolves, so the workbench doesn't try to enumerate `localfs:/` against

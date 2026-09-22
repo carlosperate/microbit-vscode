@@ -12,6 +12,9 @@
 		"vscode": "^1.91.0"
 	},
 	"browser": "./dist/extension.js",
+	"extensionDependencies": [
+		"carlosperate.bbcmicrobit-manager"
+	],
 	"activationEvents": [
 		"onStartupFinished"
 	],
@@ -32,6 +35,10 @@
 			{
 				"command": "microbitIde.sidebarActions.createProject",
 				"title": "BBC micro:bit IDE: Create new project"
+			},
+			{
+				"command": "microbitIde.sidebarActions.showWelcome",
+				"title": "BBC micro:bit IDE: Open the welcome page"
 			}
 		],
 		"configuration": {

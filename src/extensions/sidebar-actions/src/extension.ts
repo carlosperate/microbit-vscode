@@ -1,9 +1,40 @@
+import type { MicrobitManagerApi } from 'vscode-bbcmicrobit-manager-api';
 import * as vscode from 'vscode';
 
 import { detectLanguage, scanSignals, type Entry, type Language, type ReadDirectory } from './detect';
+import { compatibleApiVersion } from './managerVersion';
+
+const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
+const MANAGER_API_VERSION = '0.3.0';
 
 const VIEW_ID = 'microbitIde.sidebarActions';
 const EXPANDED_ONCE = 'microbitIde.sidebarActions.expandedOnce';
+const WELCOME_SHOWN = 'microbitIde.sidebarActions.welcomeShown';
+const SIZES_SETTLED = 'microbitIde.sidebarActions.sizesSettled';
+const WELCOME_VIEW_TYPE = 'microbitIde.welcome';
+
+// The welcome page's markup, inlined at build time by `esbuild.config.mjs`.
+declare const __WELCOME_HTML__: string;
+
+/** The page can ask for these and nothing else, so its markup can never widen what it reaches. */
+const WELCOME_COMMANDS = new Set([
+	'microbitIde.sidebarActions.buildAndFlash',
+	'microbitIde.sidebarActions.openSerialTerminal',
+	'microbitIde.sidebarActions.createProject',
+	'microbitIde.openLocalFolder',
+	'microbitIde.switchStorage',
+	'bbcmicrobit-micropython.openSimulator',
+]);
+
+/** The six themes `carlosperate.microbit-themes` ships, by the label `workbench.colorTheme` takes. */
+const WELCOME_THEMES = new Set([
+	'micro:bit Pixel Light',
+	'micro:bit Pixel Dark',
+	'micro:bit Spark Light',
+	'micro:bit Spark Dark',
+	'micro:bit Halo Light',
+	'micro:bit Halo Dark',
+]);
 
 /**
  * An answer given to the picker, for this run of the IDE only. A workspace URI
@@ -54,7 +85,17 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('microbitIde.sidebarActions.buildAndFlash', () => buildAndFlash()),
 		vscode.commands.registerCommand('microbitIde.sidebarActions.openSerialTerminal', () => run(OPEN_TERMINAL)),
 		vscode.commands.registerCommand('microbitIde.sidebarActions.showAllActions', () => run(SHOW_MENU)),
-		vscode.commands.registerCommand('microbitIde.sidebarActions.createProject', () => createProject())
+		vscode.commands.registerCommand('microbitIde.sidebarActions.createProject', () => createProject()),
+		vscode.commands.registerCommand('microbitIde.sidebarActions.showWelcome', () => showWelcome()),
+		// Without this the tab is dropped on reload, since a web reload restarts the
+		// extension host and nothing would recreate the panel VS Code restored.
+		vscode.window.registerWebviewPanelSerializer(WELCOME_VIEW_TYPE, {
+			deserializeWebviewPanel: async (panel) => {
+				welcomePanel?.dispose();
+				welcomePanel = panel;
+				hydrateWelcome(panel);
+			},
+		})
 	);
 
 	// Explorer forces contributed views closed; expand once to preserve later user choices.
@@ -62,6 +103,120 @@ export function activate(context: vscode.ExtensionContext): void {
 		void context.globalState.update(EXPANDED_ONCE, true);
 		void vscode.commands.executeCommand(`${VIEW_ID}.focus`, { preserveFocus: true });
 	}
+
+	// Once per profile, not per window: reopening the IDE should not reopen it.
+	if (!context.globalState.get<boolean>(WELCOME_SHOWN)) {
+		void context.globalState.update(WELCOME_SHOWN, true);
+		showWelcome();
+	}
+
+	registerStatusBarMenu(context);
+
+	// The IDE swaps folders in place, so a session answer must not follow the user into the next project.
+	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => (answered = undefined)));
+
+	// Per workspace, since that is where VS Code keeps the sizes being settled.
+	if (!context.workspaceState.get<boolean>(SIZES_SETTLED)) {
+		// As early as the layout allows: the shorter this wait, the less chance of catching someone mid-action.
+		setTimeout(() => {
+			void settleSidebarSizes().then((settled) => {
+				if (settled) void context.workspaceState.update(SIZES_SETTLED, true);
+			});
+		}, 300);
+	}
+}
+
+/**
+ * VS Code only persists Explorer pane sizes on a layout after the first, so a
+ * fresh window may never save them and a reload lets the first pane swallow the
+ * rest. Nudging the sidebar width forces that layout while the first-load sizes
+ * are still good. Skipped while someone is typing, because it moves focus.
+ */
+async function settleSidebarSizes(): Promise<boolean> {
+	if (vscode.window.activeTextEditor) return false;
+	await vscode.commands.executeCommand('workbench.view.explorer');
+	await vscode.commands.executeCommand('workbench.action.increaseViewSize');
+	await vscode.commands.executeCommand('workbench.action.decreaseViewSize');
+	await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
+	return true;
+}
+
+/**
+ * Lists this extension's commands in the manager's status bar menu, the way the
+ * language extensions do. The manifest dependency means the manager activated
+ * first, so its exports are there; only their version needs checking.
+ */
+function registerStatusBarMenu(context: vscode.ExtensionContext): void {
+	const api = managerApi(vscode.extensions.getExtension(MANAGER_EXTENSION)?.exports);
+	if (!api) return;
+	try {
+		context.subscriptions.push(
+			api.registerMenuGroup({
+				label: 'BBC micro:bit IDE',
+				commands: [
+					{ command: 'microbitIde.sidebarActions.showWelcome', label: 'Open the welcome page' },
+					{ command: 'microbitIde.sidebarActions.createProject', label: 'Create new project' },
+					{ command: 'microbitIde.switchStorage', label: 'Switch workspace storage' },
+				],
+			})
+		);
+	} catch (error) {
+		console.warn(`[sidebar-actions] the micro:bit Manager refused the menu group: ${String(error)}`);
+	}
+}
+
+/** The manager refuses nobody, so a version mismatch is only ever noticed here. */
+function managerApi(candidate: unknown): MicrobitManagerApi | undefined {
+	const served = (candidate as { version?: unknown } | undefined)?.version;
+	if (!compatibleApiVersion(served, MANAGER_API_VERSION)) {
+		console.warn(`[sidebar-actions] micro:bit Manager API ${String(served)} is not ${MANAGER_API_VERSION}, menu entries skipped`);
+		return undefined;
+	}
+	return candidate as MicrobitManagerApi;
+}
+
+let welcomePanel: vscode.WebviewPanel | undefined;
+
+/** One panel per window: reopening reveals the existing one rather than stacking tabs. */
+function showWelcome(): void {
+	if (welcomePanel) {
+		welcomePanel.reveal(vscode.ViewColumn.One);
+		return;
+	}
+
+	// No retainContextWhenHidden: the page keeps its one bit of state itself via setState.
+	welcomePanel = vscode.window.createWebviewPanel(WELCOME_VIEW_TYPE, 'Welcome', vscode.ViewColumn.One, {
+		enableScripts: true,
+	});
+	hydrateWelcome(welcomePanel);
+}
+
+/** Shared by a fresh panel and one VS Code restored after a reload. */
+function hydrateWelcome(panel: vscode.WebviewPanel): void {
+	const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
+	panel.webview.options = { enableScripts: true };
+	panel.webview.html = __WELCOME_HTML__.replace(/\{\{nonce\}\}/g, nonce);
+
+	// The page cannot see a rejection, so this boundary is where one becomes a message.
+	panel.webview.onDidReceiveMessage((message: { type?: string; command?: string; theme?: string }) => {
+		let action: Thenable<unknown> | undefined;
+		if (message?.type === 'run' && message.command && WELCOME_COMMANDS.has(message.command)) {
+			action = run(message.command);
+		} else if (message?.type === 'theme' && message.theme && WELCOME_THEMES.has(message.theme)) {
+			action = vscode.workspace
+				.getConfiguration('workbench')
+				.update('colorTheme', message.theme, vscode.ConfigurationTarget.Global);
+		}
+		if (action) {
+			Promise.resolve(action).catch((error: unknown) =>
+				fail(`that did not work. ${error instanceof Error ? error.message : String(error)}`)
+			);
+		}
+	});
+
+	panel.onDidDispose(() => {
+		if (welcomePanel === panel) welcomePanel = undefined;
+	});
 }
 
 async function buildAndFlash(): Promise<void> {
@@ -190,12 +345,15 @@ function ask(installed: Language[]): Promise<Language | undefined> {
 		pick.onDidAccept(() => settle(pick.selectedItems[0]?.language));
 		// Saved before the pick closes, so the build never starts against a
 		// half-written setting and a failed save is reported before the flash.
+		let hidden = false;
 		pick.onDidTriggerItemButton(async ({ item }) => {
 			pick.busy = true;
 			await remember(item.language);
-			settle(item.language);
+			// Escape during the save means cancel: the choice is kept, the build is not.
+			if (!hidden) settle(item.language);
 		});
 		pick.onDidHide(() => {
+			hidden = true;
 			pick.dispose();
 			if (chosen) answered = chosen;
 			resolve(chosen);
@@ -214,7 +372,7 @@ async function remember(language: Language): Promise<void> {
 		await vscode.workspace.getConfiguration('microbitIde').update('projectLanguage', language, target);
 	} catch (error) {
 		warn(
-			`built as ${LANGUAGES[language].label}, but the choice could not be saved. ` +
+			`the choice of ${LANGUAGES[language].label} could not be saved. ` +
 				`${error instanceof Error ? error.message : String(error)}`
 		);
 	}

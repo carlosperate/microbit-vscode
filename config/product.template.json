@@ -12,11 +12,12 @@
 	},
 	"folderUri": {
 		"scheme": "memfs",
-		"path": "/welcome"
+		"path": "/Welcome workspace"
 	},
 	"configurationDefaults": {
 		"workbench.colorTheme": "micro:bit Pixel Light",
-		"micropython-lsp.target": "microbit"
+		"micropython-lsp.target": "microbit",
+		"workbench.startupEditor": "none"
 	},
 	"additionalBuiltinExtensions": []
 }
