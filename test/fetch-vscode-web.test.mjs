@@ -202,7 +202,7 @@ describe('fetchVscodeWeb', () => {
 
 		await expect(
 			fetchVscodeWeb({ config: { vscodeVersion: VERSION, repoSlug: SLUG, sha256: null }, cacheDir, fetchImpl, log })
-		).rejects.toThrow(/corrupted download or tampered cache/);
+		).rejects.toThrow(/Corrupted download or tampered cache/);
 
 		expect(existsSync(zipPath())).toBe(false);
 		expect(existsSync(sidecarPath())).toBe(false);

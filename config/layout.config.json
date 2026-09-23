@@ -7,29 +7,19 @@
 		{ "id": "workbench.view.extensions" },
 		{ "id": "workbench.view.extension.bbcmicrobit-micropython" },
 		{ "id": "workbench.view.extension.bbcmicrobit-cpp" },
-		{ "id": "workbench.view.extension.bbcmicrobit" }
+		{ "id": "workbench.view.extension.bbcmicrobit", "hidden": true }
 	],
 	"explorerViews": [
 		{ "id": "microbitIde.sidebarActions" },
 		{ "id": "workbench.explorer.fileView" },
 		{ "id": "outline" },
-		{ "id": "timeline" },
+		{ "id": "timeline", "hidden": true },
 		{ "id": "workbench.explorer.openEditorsView", "hidden": true }
-	],
-	"viewContainers": [
-		{
-			"id": "workbench.view.extension.bbcmicrobit",
-			"views": [
-				"bbcmicrobit-manager.board",
-				"bbcmicrobit-cpp.panel",
-				"bbcmicrobit-micropython.simulator"
-			]
-		}
 	],
 	"extensionState": {
 		"carlosperate.bbcmicrobit-manager": {
-			"bbcmicrobit-manager.combined": true,
-			"bbcmicrobit-manager.panelHidden": false
+			"bbcmicrobit-manager.combined": false,
+			"bbcmicrobit-manager.panelHidden": true
 		}
 	}
 }
