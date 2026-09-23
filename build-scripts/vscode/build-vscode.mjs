@@ -4,7 +4,7 @@
  * Reads the pinned version from config/vscode-web.config.json, shallow-clones
  * microsoft/vscode at that tag, applies the vendored bootstrap patch
  * (build-scripts/vscode/workbench.ts), runs `gulp vscode-web-min`, and publishes
- * the result to <cache>/vscode-web/ — the single consumable bundle that
+ * the result to <cache>/vscode-web/, the single consumable bundle that
  * build.mjs and fetch-vscode-web.mjs read and version-check.
  *
  * Layout under the cache dir (default ./.cache):
@@ -97,7 +97,7 @@ function cloneVscode(vscodeVersion, scratchDir, cloneDir) {
       console.log(`Reusing existing clone at ${cloneDir} (${current}).`);
       return;
     }
-    console.log(`Clone is at ${current ?? 'unknown'}, want ${vscodeVersion} — re-cloning.`);
+    console.log(`Clone is at ${current ?? 'unknown'}, want ${vscodeVersion}. Re-cloning.`);
     fs.rmSync(cloneDir, { recursive: true, force: true });
   }
   run('git', [
@@ -111,7 +111,7 @@ function applyWorkbenchPatch(vscodeVersion, cloneDir) {
   const target = path.join(cloneDir, 'src', 'vs', 'code', 'browser', 'workbench', 'workbench.ts');
   if (!fs.existsSync(target)) {
     throw new Error(
-      `upstream moved the workbench entrypoint — patch may need rebasing ` +
+      `upstream moved the workbench entrypoint, patch may need rebasing ` +
       `against vscodeVersion=${vscodeVersion}\n` +
       `  expected: ${path.relative(cloneDir, target)}`
     );
@@ -124,7 +124,7 @@ function applyWorkbenchPatch(vscodeVersion, cloneDir) {
  *
  * gulp writes to <scratch>/vscode-web (a sibling of the clone; the name is
  * forced by upstream). We verify it exists and that its version matches what we
- * built, then atomically replace <cache>/vscode-web — the single bundle that
+ * built, then atomically replace <cache>/vscode-web, the single bundle that
  * build.mjs and fetch-vscode-web.mjs read and version-check. This runs only on
  * gulp success (a failed build aborts before reaching here), so the consumable
  * is never partial; a stale (wrong-version) consumable is caught by the version

@@ -92,10 +92,10 @@ async function verifyChecksum(filePath, expectedHex, mode, version, cleanup) {
 		await cleanup();
 		throw new Error(
 			mode === 'locked'
-				? 'checksum mismatch against config/vscode-web.config.json sha256 — ' +
-					'the release artifact does not match the committed hash; investigate or update the lock'
-				: `checksum mismatch against vscode-web-v${version}.zip.sha256 — ` +
-					'corrupted download or tampered cache; cleared, please retry'
+				? 'checksum mismatch against config/vscode-web.config.json sha256. ' +
+					'The release artifact does not match the committed hash; investigate or update the lock'
+				: `checksum mismatch against vscode-web-v${version}.zip.sha256. ` +
+					'Corrupted download or tampered cache; cleared, please retry'
 		);
 	}
 }
@@ -125,7 +125,7 @@ async function downloadFile(url, destPath, fetchImpl, ctx) {
  *
  * We use yauzl.fromBuffer (not yauzl.open) deliberately: yauzl's fd-backed read
  * streams (fd-slicer doing a per-entry fs.read) deadlock on large multi-chunk
- * entries on Linux — the first chunk is read, then nothing re-schedules the
+ * entries on Linux. The first chunk is read, then nothing re-schedules the
  * next read and the event loop drains with the promise unsettled. Slicing an
  * in-memory buffer skips fs.read entirely, so there's nothing to stall.
  */
@@ -142,7 +142,7 @@ async function unzip(zipBuffer, destDir) {
 		zip.on('entry', (entry) => {
 			// Drive each entry to completion, then pull the next. Any failure
 			// rejects the whole unzip, so readEntry() is always either called
-			// again or the promise is settled — it can't hang.
+			// again or the promise is settled, so it can't hang.
 			extractEntry(zip, entry, destDir)
 				.then(() => zip.readEntry())
 				.catch(reject);
@@ -200,10 +200,10 @@ export async function fetchVscodeWeb({
 	if (existsSync(bundlePkg)) {
 		const current = JSON.parse(await readFile(bundlePkg, 'utf8')).version;
 		if (current === version) {
-			log(`vscode-web ${version} already present in ${path.relative(root, bundleDir)} — skipping.`);
+			log(`vscode-web ${version} already present in ${path.relative(root, bundleDir)}, skipping.`);
 			return { action: 'skip', version };
 		}
-		log(`Cached vscode-web is ${current}, want ${version} — refetching.`);
+		log(`Cached vscode-web is ${current}, want ${version}. Refetching.`);
 	}
 
 	// 2. Clear any stale bundle, then obtain + verify the zip.
@@ -241,7 +241,7 @@ export async function fetchVscodeWeb({
 
 	if (!existsSync(bundlePkg)) {
 		throw new Error(
-			`unzip did not produce ${path.relative(root, bundlePkg)} — unexpected archive layout`
+			`unzip did not produce ${path.relative(root, bundlePkg)}, unexpected archive layout`
 		);
 	}
 	return { action: 'downloaded', version };

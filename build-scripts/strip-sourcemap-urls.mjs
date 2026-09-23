@@ -8,7 +8,7 @@
  * DevTools open every one of them stalls on a dead request for a map we don't
  * ship anyway.
  *
- * Relative `sourceMappingURL` comments are preserved — some vendored deps
+ * Relative `sourceMappingURL` comments are preserved, since some vendored deps
  * (xterm addons, applicationinsights) do ship their `.map` alongside. Only a
  * leading `//` or `http(s)://` marks a URL as external; no shipped relative map
  * begins that way.

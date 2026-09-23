@@ -61,6 +61,15 @@ async function launchChrome(url) {
 	return { child, discard };
 }
 
+// A child, since build.mjs runs on import; a failed build has already said why.
+function build() {
+	return new Promise((resolve) => {
+		spawn(process.execPath, [path.join(root, 'build-scripts', 'build.mjs')], { stdio: 'inherit' }).on('exit', (code) =>
+			code === 0 ? resolve() : process.exit(code ?? 1)
+		);
+	});
+}
+
 export function serve({ port = Number(process.env.PORT ?? 8080) } = {}) {
 	const assets = sirv(dist, { dev: true, single: true });
 	const server = createServer((req, res) =>
@@ -76,10 +85,7 @@ export function serve({ port = Number(process.env.PORT ?? 8080) } = {}) {
 // the URL is `file:///C:/...`, leaving the server unstarted.
 const isMain = process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
-	if (!existsSync(path.join(dist, 'index.html'))) {
-		console.error('dist/index.html is missing. Run `npm run build` first.');
-		process.exit(1);
-	}
+	await build();
 	const port = Number(process.env.PORT ?? 8080);
 	serve({ port });
 	const chrome = process.argv.includes('--no-browser') ? undefined : await launchChrome(`http://localhost:${port}/`);

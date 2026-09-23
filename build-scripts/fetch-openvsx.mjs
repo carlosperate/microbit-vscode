@@ -35,7 +35,7 @@ export async function unpackVsix(zipPath, outDir) {
 	await mkdir(outDir, { recursive: true });
 
 	// fromBuffer (not yauzl.open): yauzl's fd-backed read streams deadlock on
-	// large multi-chunk entries on Linux — the first chunk is read, then the
+	// large multi-chunk entries on Linux. The first chunk is read, then the
 	// next read is never re-scheduled and the event loop drains with the promise
 	// unsettled. Slicing an in-memory buffer skips fs.read, so nothing stalls.
 	const zipBuffer = await readFile(zipPath);
@@ -50,7 +50,7 @@ export async function unpackVsix(zipPath, outDir) {
 		zip.on('entry', (entry) => {
 			// Drive each entry to completion, then pull the next. Any failure
 			// rejects the whole unpack, so readEntry() is always either called
-			// again or the promise is settled — it can't hang.
+			// again or the promise is settled, so it can't hang.
 			unpackEntry(zip, entry, outDir)
 				.then(() => zip.readEntry())
 				.catch(reject);

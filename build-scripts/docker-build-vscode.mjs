@@ -48,7 +48,7 @@ function runContainer() {
   // repo's @types/vscode and compiles it against the wrong VS Code version. So we
   // mount the host .cache at /build (a node_modules-free parent) and point the
   // build there via BUILD_DIR. The clone/scratch live in .cache/vscode-build and
-  // the published bundle in .cache/vscode-web — same host dir, just addressed via
+  // the published bundle in .cache/vscode-web, same host dir, just addressed via
   // /build so the in-container path has a clean parent.
   const cacheDir = path.join(root, '.cache');
   fs.mkdirSync(cacheDir, { recursive: true });

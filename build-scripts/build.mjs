@@ -200,8 +200,7 @@ async function writeProductJson(vscodeWebVersion, extensionRefs, enabledApiPropo
 		...(product.additionalBuiltinExtensions ?? []),
 		...extensionRefs,
 	];
-	// `index.html` spreads product.json into the workbench options, so the seeded
-	// layout reaches VS Code as the `profile` option without any code there.
+	// index.html passes the profile through to the workbench options.
 	const profile = profileFromLayout(JSON.parse(await readFile(layoutConfig, 'utf8')));
 	if (profile) product.profile = profile;
 	await writeFile(path.join(dist, 'product.json'), JSON.stringify(product, null, '\t') + '\n');

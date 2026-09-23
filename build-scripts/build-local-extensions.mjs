@@ -16,7 +16,7 @@ const localExtensions = [
 
 /**
  * Build a local extension from its source directory.
- * 
+ *
  * Modifies the extension's esbuild options and package.json to output to
  * `dist/extensions/<publisher>.<name>/`.
  */
