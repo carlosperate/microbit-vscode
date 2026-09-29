@@ -3,15 +3,22 @@ import * as vscode from 'vscode';
 
 import { detectLanguage, scanSignals, type Entry, type Language, type ReadDirectory } from './detect';
 import { compatibleApiVersion } from './managerVersion';
+import type { StorageApi } from '../../workspace-storage/src/api';
+import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeTheme, type Mode } from './mode';
 
 const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
+const STORAGE_EXTENSION = 'carlosperate.microbit-ide-workspace-storage';
 const MANAGER_API_VERSION = '0.3.0';
 
 const VIEW_ID = 'microbitIde.sidebarActions';
 const EXPANDED_ONCE = 'microbitIde.sidebarActions.expandedOnce';
-const WELCOME_SHOWN = 'microbitIde.sidebarActions.welcomeShown';
 const SIZES_SETTLED = 'microbitIde.sidebarActions.sizesSettled';
 const WELCOME_VIEW_TYPE = 'microbitIde.welcome';
+const MICROPYTHON_MODE = 'microbitIde.sidebarActions.microPythonMode';
+const CPP_MODE = 'microbitIde.sidebarActions.cppMode';
+
+// Registered by public/index.html, since no VS Code API pins an activity bar container.
+const SET_PINNED_HOST = 'microbitIde._setPinnedHost';
 
 // The welcome page's markup, inlined at build time by `esbuild.config.mjs`.
 declare const __WELCOME_HTML__: string;
@@ -20,20 +27,13 @@ declare const __WELCOME_HTML__: string;
 const WELCOME_COMMANDS = new Set([
 	'microbitIde.sidebarActions.buildAndFlash',
 	'microbitIde.sidebarActions.openSerialTerminal',
-	'microbitIde.sidebarActions.createProject',
 	'microbitIde.openLocalFolder',
 	'microbitIde.switchStorage',
-	'bbcmicrobit-micropython.openSimulator',
-]);
-
-/** The six themes `carlosperate.microbit-themes` ships, by the label `workbench.colorTheme` takes. */
-const WELCOME_THEMES = new Set([
-	'micro:bit Pixel Light',
-	'micro:bit Pixel Dark',
-	'micro:bit Spark Light',
-	'micro:bit Spark Dark',
-	'micro:bit Halo Light',
-	'micro:bit Halo Dark',
+	'microbitIde.useBrowserStorage',
+	'microbitIde.useTemporaryStorage',
+	'bbcmicrobit-micropython.runInSimulator',
+	MICROPYTHON_MODE,
+	CPP_MODE,
 ]);
 
 /**
@@ -48,18 +48,20 @@ let answered: Language | undefined;
  * button here is a command someone else registered. Each is checked for before
  * it runs, never assumed from which app we are in.
  */
-const LANGUAGES: Record<Language, { label: string; detail: string; flash: string; create: string }> = {
+const LANGUAGES: Record<Language, { label: string; detail: string; flash: string; create: string; main: string }> = {
 	micropython: {
 		label: 'MicroPython',
 		detail: 'Python files flashed onto the board',
 		flash: 'bbcmicrobit-micropython.flash',
 		create: 'bbcmicrobit-micropython.createProject',
+		main: 'main.py',
 	},
 	cpp: {
 		label: 'C++',
 		detail: 'C++ sources compiled with CODAL',
 		flash: 'bbcmicrobit-cpp.flash',
 		create: 'bbcmicrobit-cpp.createProject',
+		main: 'main.cpp',
 	},
 };
 
@@ -87,15 +89,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('microbitIde.sidebarActions.showAllActions', () => run(SHOW_MENU)),
 		vscode.commands.registerCommand('microbitIde.sidebarActions.createProject', () => createProject()),
 		vscode.commands.registerCommand('microbitIde.sidebarActions.showWelcome', () => showWelcome()),
-		// Without this the tab is dropped on reload, since a web reload restarts the
-		// extension host and nothing would recreate the panel VS Code restored.
-		vscode.window.registerWebviewPanelSerializer(WELCOME_VIEW_TYPE, {
-			deserializeWebviewPanel: async (panel) => {
-				welcomePanel?.dispose();
-				welcomePanel = panel;
-				hydrateWelcome(panel);
-			},
-		})
+		vscode.commands.registerCommand(MICROPYTHON_MODE, () => switchMode('micropython')),
+		vscode.commands.registerCommand(CPP_MODE, () => switchMode('cpp'))
 	);
 
 	// Explorer forces contributed views closed; expand once to preserve later user choices.
@@ -104,16 +99,17 @@ export function activate(context: vscode.ExtensionContext): void {
 		void vscode.commands.executeCommand(`${VIEW_ID}.focus`, { preserveFocus: true });
 	}
 
-	// Once per profile, not per window: reopening the IDE should not reopen it.
-	if (!context.globalState.get<boolean>(WELCOME_SHOWN)) {
-		void context.globalState.update(WELCOME_SHOWN, true);
-		showWelcome();
-	}
+	// Every session opens on it, in front of any tabs the session restored. With no
+	// serializer registered, VS Code never saves the tab, so a session never has two.
+	showWelcome();
+
+	// The folder never changes, so a change of storage is what puts another project in it.
+	const forgetAnswer = storageApi()?.onDidChangeStorage(() => {
+		answered = undefined;
+	});
+	if (forgetAnswer) context.subscriptions.push(forgetAnswer);
 
 	registerStatusBarMenu(context);
-
-	// The IDE swaps folders in place, so a session answer must not follow the user into the next project.
-	context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => (answered = undefined)));
 
 	// Per workspace, since that is where VS Code keeps the sizes being settled.
 	if (!context.workspaceState.get<boolean>(SIZES_SETTLED)) {
@@ -155,6 +151,8 @@ function registerStatusBarMenu(context: vscode.ExtensionContext): void {
 				label: 'BBC micro:bit IDE',
 				commands: [
 					{ command: 'microbitIde.sidebarActions.showWelcome', label: 'Open the welcome page' },
+					{ command: MICROPYTHON_MODE, label: 'Switch to MicroPython mode' },
+					{ command: CPP_MODE, label: 'Switch to C++ mode' },
 					{ command: 'microbitIde.sidebarActions.createProject', label: 'Create new project' },
 					{ command: 'microbitIde.switchStorage', label: 'Switch workspace storage' },
 				],
@@ -185,38 +183,116 @@ function showWelcome(): void {
 	}
 
 	// No retainContextWhenHidden: the page keeps its one bit of state itself via setState.
-	welcomePanel = vscode.window.createWebviewPanel(WELCOME_VIEW_TYPE, 'Welcome', vscode.ViewColumn.One, {
+	const panel = vscode.window.createWebviewPanel(WELCOME_VIEW_TYPE, 'Welcome', vscode.ViewColumn.One, {
 		enableScripts: true,
 	});
-	hydrateWelcome(welcomePanel);
-}
-
-/** Shared by a fresh panel and one VS Code restored after a reload. */
-function hydrateWelcome(panel: vscode.WebviewPanel): void {
+	welcomePanel = panel;
 	const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
-	panel.webview.options = { enableScripts: true };
 	panel.webview.html = __WELCOME_HTML__.replace(/\{\{nonce\}\}/g, nonce);
+
+	// The page names the storage in use and offers the other. It asks again each time
+	// it reloads, which it does whenever the tab is shown after being hidden.
+	const tellStorage = () => void panel.webview.postMessage({ type: 'storage', storage: storageApi()?.storage() });
+	const following = storageApi()?.onDidChangeStorage(tellStorage);
 
 	// The page cannot see a rejection, so this boundary is where one becomes a message.
 	panel.webview.onDidReceiveMessage((message: { type?: string; command?: string; theme?: string }) => {
+		if (message?.type === 'ready') return tellStorage();
 		let action: Thenable<unknown> | undefined;
 		if (message?.type === 'run' && message.command && WELCOME_COMMANDS.has(message.command)) {
 			action = run(message.command);
-		} else if (message?.type === 'theme' && message.theme && WELCOME_THEMES.has(message.theme)) {
-			action = vscode.workspace
-				.getConfiguration('workbench')
-				.update('colorTheme', message.theme, vscode.ConfigurationTarget.Global);
+		} else if (message?.type === 'theme' && message.theme && MICROBIT_THEMES.has(message.theme)) {
+			action = setTheme(message.theme);
 		}
 		if (action) {
-			Promise.resolve(action).catch((error: unknown) =>
-				fail(`that did not work. ${error instanceof Error ? error.message : String(error)}`)
-			);
+			Promise.resolve(action).catch((error: unknown) => fail(`that did not work. ${errorText(error)}`));
 		}
 	});
 
 	panel.onDidDispose(() => {
-		if (welcomePanel === panel) welcomePanel = undefined;
+		following?.dispose();
+		welcomePanel = undefined;
 	});
+}
+
+/** The storage extension's exports: a manifest dependency, so it has activated before this one. */
+const storageApi = () => vscode.extensions.getExtension<StorageApi>(STORAGE_EXTENSION)?.exports;
+
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+const setTheme = (theme: string) =>
+	vscode.workspace.getConfiguration('workbench').update('colorTheme', theme, vscode.ConfigurationTarget.Global);
+
+/** Without the page's bridge the activity bar just stays as it is. */
+async function pin(changes: Record<string, boolean>): Promise<void> {
+	const pinned = await Promise.resolve(vscode.commands.executeCommand<boolean>(SET_PINNED_HOST, changes)).catch(() => false);
+	if (!pinned) console.warn('[sidebar-actions] the page could not pin the micro:bit sidebars');
+}
+
+/** In turn with a storage switch or another mode, either of which would change the files under this one. */
+function switchMode(mode: Mode): Promise<void> {
+	const exclusive = storageApi()?.exclusive ?? ((task: () => Promise<void>) => task());
+	return exclusive(() => applyMode(mode));
+}
+
+/** Only the confirmation comes before any change, so declining it leaves the IDE as it was. */
+async function applyMode(mode: Mode): Promise<void> {
+	if (!(await registeredCommands()).has(LANGUAGES[mode].create)) {
+		fail(`the ${LANGUAGES[mode].label} extension is not available, so the mode was not changed.`);
+		return;
+	}
+	try {
+		const root = projectFolder()?.uri;
+		const storage = storageApi();
+		// The temporary workspace, whose files a mode replaces. Kept storage is only ever added to.
+		const scratch = storage?.storage() === 'memfs' ? storage : undefined;
+		if (scratch && (await scratch.scratchChanged()) && !(await confirmReplace(mode))) return;
+
+		const { kind } = vscode.window.activeColorTheme;
+		await setTheme(modeTheme(mode, kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast));
+		// Opening a container still unpinned makes VS Code store its own copy of the list, which
+		// flushes over ours, and unpinning the one showing leaves its icon behind once it closes.
+		await pin({ [modeContainer(mode)]: true });
+		await vscode.commands.executeCommand(modeSidebar(mode));
+		await pin(modePins(mode));
+
+		if (!root) return;
+		// The last step, and undone if the starter fails, so a failed switch costs no files.
+		const starter = () => openStarter(mode, root);
+		await (scratch ? scratch.replaceScratch(starter) : starter());
+	} catch (error) {
+		fail(`switching to ${LANGUAGES[mode].label} mode did not finish. ${errorText(error)}`);
+	}
+}
+
+async function confirmReplace(mode: Mode): Promise<boolean> {
+	const replace = 'Replace files';
+	const answer = await vscode.window.showWarningMessage(
+		`Replace the files in this workspace with a new ${LANGUAGES[mode].label} project?`,
+		{ modal: true, detail: 'Your changes will be deleted. To keep them, switch to browser storage first.' },
+		replace
+	);
+	return answer === replace;
+}
+
+const exists = (uri: vscode.Uri) =>
+	vscode.workspace.fs.stat(uri).then(
+		() => true,
+		() => false
+	);
+
+/** The language extension writes its own template, never over a file; an existing one is just opened. */
+async function openStarter(mode: Mode, root: vscode.Uri): Promise<void> {
+	const folder = mode === 'micropython' ? vscode.Uri.joinPath(root, ...projectSegments(root)) : root;
+	const main = vscode.Uri.joinPath(folder, LANGUAGES[mode].main);
+	if (await exists(main)) {
+		await vscode.window.showTextDocument(main);
+		return;
+	}
+	// C++ takes the folder, MicroPython always uses its configured project folder.
+	await vscode.commands.executeCommand(LANGUAGES[mode].create, ...(mode === 'cpp' ? [root] : []));
+	// Both report a failure themselves and return, so only the file says whether it worked.
+	if (!(await exists(main))) throw new Error(`${LANGUAGES[mode].main} was not created.`);
 }
 
 async function buildAndFlash(): Promise<void> {
@@ -363,23 +439,19 @@ function ask(installed: Language[]): Promise<Language | undefined> {
 	});
 }
 
-/** Workspace scope where there is one, so the choice travels with the project and not the user. */
+/** The project folder's own settings, so the choice stays with its files when the storage changes. */
 async function remember(language: Language): Promise<void> {
-	const target = vscode.workspace.workspaceFolders?.length
-		? vscode.ConfigurationTarget.Workspace
-		: vscode.ConfigurationTarget.Global;
+	const folder = projectFolder();
+	const target = folder ? vscode.ConfigurationTarget.WorkspaceFolder : vscode.ConfigurationTarget.Global;
 	try {
-		await vscode.workspace.getConfiguration('microbitIde').update('projectLanguage', language, target);
+		await vscode.workspace.getConfiguration('microbitIde', folder?.uri).update('projectLanguage', language, target);
 	} catch (error) {
-		warn(
-			`the choice of ${LANGUAGES[language].label} could not be saved. ` +
-				`${error instanceof Error ? error.message : String(error)}`
-		);
+		warn(`the choice of ${LANGUAGES[language].label} could not be saved. ${errorText(error)}`);
 	}
 }
 
 function settingLanguage(): Language | undefined {
-	const configured = vscode.workspace.getConfiguration('microbitIde').get<string>('projectLanguage');
+	const configured = vscode.workspace.getConfiguration('microbitIde', projectFolder()?.uri).get<string>('projectLanguage');
 	return configured === 'micropython' || configured === 'cpp' ? configured : undefined;
 }
 

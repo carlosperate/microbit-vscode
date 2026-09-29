@@ -148,6 +148,22 @@ async function patchVscodeBundle() {
 	}
 	assertWebviewPatched(await readFile(path.join(preDir, required), 'utf8'), required);
 	console.log(`  patched webview origin check in ${patched} file(s); CSP hash in sync`);
+
+	// (3) Not a patch: public/index.html pins activity bar containers through these internals.
+	const workbench = await readFile(path.join(vscodeDir, 'out', 'vs', 'workbench', 'workbench.web.main.js'), 'utf8');
+	const anchors = {
+		'state database name': '"vscode-web-state-db-"',
+		'application storage id': 'id:"global",broadcastChanges:!0',
+		'pinned containers key': '"workbench.activity.pinnedViewlets2"',
+	};
+	for (const [what, anchor] of Object.entries(anchors)) {
+		if (!workbench.includes(anchor)) {
+			throw new Error(`storage check: the workbench no longer has its ${what} (${anchor}); update setPinned in public/index.html.`);
+		}
+	}
+	if (!/\{changed:[\w$.]+,deleted:[\w$.]+\}/.test(workbench)) {
+		throw new Error('storage check: the workbench changed its storage sync message; update setPinned in public/index.html.');
+	}
 }
 
 /** Assert the patched webview bootstrap carries our bypass and a matching CSP hash. */

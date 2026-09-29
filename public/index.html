@@ -22,6 +22,7 @@
 
 	<!-- Startup (do not modify order of script tags!) -->
 	<script src="./rebase.js"></script>
+	<script src="./session.js"></script>
 	<script src="./vscode/out/vs/loader.js"></script>
 	<script src="./vscode/out/vs/webPackagePaths.js"></script>
 	<script>
@@ -43,7 +44,7 @@
 	<script>
 		// Boot the workbench inline (replacing the upstream
 		// `vs/code/browser/workbench/workbench.js` embedder) so we can pass
-		// `IWorkbenchConstructionOptions.commands` — host-side commands that run
+		// `IWorkbenchConstructionOptions.commands`, host-side commands that run
 		// on the main thread and are callable from worker-side extensions via
 		// `vscode.commands.executeCommand`. This is the canonical bridge for
 		// browser APIs the extension host can't reach (e.g. `showDirectoryPicker`,
@@ -62,18 +63,141 @@
 			const HANDLE_DB = 'microbit-local-handle';
 			const HANDLE_STORE = 'handles';
 			const HANDLE_KEY = 'root';
-			function saveLocalFolderHandle(handle) {
+			// Shared with the `workspace-storage` extension, which records the storage in use there.
+			const SESSION_DB = 'microbit-session';
+			const SESSION_STORE = 'session';
+
+			// Never created here: a missing database would be made empty and its owner's upgrade would never run.
+			function openExisting(name, store) {
+				return new Promise((resolve) => {
+					const req = indexedDB.open(name);
+					req.onupgradeneeded = () => req.transaction.abort();
+					req.onerror = () => resolve(undefined);
+					req.onsuccess = () => {
+						if (req.result.objectStoreNames.contains(store)) return resolve(req.result);
+						req.result.close();
+						resolve(undefined);
+					};
+				});
+			}
+
+			async function readIdb(name, store, key) {
+				const db = await openExisting(name, store);
+				if (!db) return undefined;
+				return new Promise((resolve) => {
+					const get = db.transaction(store).objectStore(store).get(key);
+					get.onsuccess = () => resolve(get.result);
+					get.onerror = () => resolve(undefined);
+					db.close();
+				});
+			}
+
+			// For this IDE's own two databases, each one store, created on first use.
+			function putIdb(name, store, key, value) {
 				return new Promise((resolve, reject) => {
-					const req = indexedDB.open(HANDLE_DB, 1);
-					req.onupgradeneeded = () => req.result.createObjectStore(HANDLE_STORE);
+					const req = indexedDB.open(name, 1);
+					req.onupgradeneeded = () => req.result.createObjectStore(store);
 					req.onerror = () => reject(req.error);
 					req.onsuccess = () => {
-						const db = req.result;
-						const tx = db.transaction(HANDLE_STORE, 'readwrite');
-						tx.objectStore(HANDLE_STORE).put(handle, HANDLE_KEY);
+						const tx = req.result.transaction(store, 'readwrite');
+						tx.objectStore(store).put(value, key);
 						tx.oncomplete = () => resolve();
 						tx.onerror = () => reject(tx.error);
+						req.result.close();
 					};
+				});
+			}
+
+			// Every tab holds `microbit-ide` shared while it is open, so it is only free to take
+			// exclusively when no other tab is. Tabs start one at a time, under a second lock,
+			// so none can open between this tab's check and its own hold.
+			function startTab(whenAlone) {
+				if (!navigator.locks) return whenAlone();
+				return navigator.locks.request('microbit-ide-start', async () => {
+					await navigator.locks.request('microbit-ide', { ifAvailable: true }, (lock) => lock && whenAlone());
+					await new Promise((held) => {
+						navigator.locks.request('microbit-ide', { mode: 'shared' }, () => {
+							held();
+							return new Promise(() => {});
+						});
+					});
+				});
+			}
+
+			// memfs keeps nothing past the tab, and so neither does the editor: VS Code's own
+			// databases go before it loads, and it starts from the product's defaults.
+			async function forgetEditorState() {
+				const names = indexedDB.databases
+					? (await indexedDB.databases()).map((db) => db.name)
+					: ['vscode-web-db', 'vscode-web-state-db-global'];
+				await Promise.all(
+					names
+						.filter((name) => name?.startsWith('vscode-web-'))
+						.map((name) => new Promise((resolve) => {
+							const req = indexedDB.deleteDatabase(name);
+							req.onsuccess = req.onerror = req.onblocked = resolve;
+						}))
+				);
+				localStorage.clear();
+			}
+
+			// Decided before VS Code loads, as it settles whether the saved editor state is kept.
+			const remembered = await readIdb(SESSION_DB, SESSION_STORE, 'storage');
+			let localAccess = false;
+			if (remembered === 'localfs') {
+				const handle = await readIdb(HANDLE_DB, HANDLE_STORE, HANDLE_KEY);
+				localAccess = (await handle?.queryPermission?.({ mode: 'readwrite' }).catch(() => undefined)) === 'granted';
+			}
+			const start = window.microbitSession.startStorage(remembered, localAccess);
+			await Promise.all([
+				startTab(() => (start === 'memfs' ? forgetEditorState() : undefined)),
+				putIdb(SESSION_DB, SESSION_STORE, 'start', start).catch(() => console.warn('micro:bit IDE: the storage to start in was not recorded')),
+			]);
+
+			// VS Code has no API to pin an activity bar container. It keeps the pinned list in this
+			// database and syncs other windows over a BroadcastChannel of the same name, so a write
+			// announced there reaches this window too. `build.mjs` checks both names still exist.
+			const STATE_DB = 'vscode-web-state-db-global';
+			const PINNED_KEY = 'workbench.activity.pinnedViewlets2';
+			// A channel never hears its own posts, so everything this one hears is VS Code.
+			const stateChannel = new BroadcastChannel(STATE_DB);
+
+			// VS Code flushes every 5 s, and a copy it stored before our write still lands after it. So for
+			// one flush and a margin, any of its writes that undoes the pins asked for is written over again.
+			const REASSERT_MS = 8000;
+			let wanted = {};
+			let wantedUntil = 0;
+			stateChannel.onmessage = (event) => {
+				if (Date.now() > wantedUntil) return;
+				const stored = event.data?.changed?.get?.(PINNED_KEY);
+				if (typeof stored === 'string' && window.microbitSession.setPinned(stored, wanted) !== stored) void writePinned();
+			};
+
+			function setPinned(changes) {
+				if (Date.now() > wantedUntil) wanted = {};
+				wanted = { ...wanted, ...changes };
+				wantedUntil = Date.now() + REASSERT_MS;
+				return writePinned();
+			}
+
+			// Always announced, even unchanged: the database may hold an older copy than VS Code does.
+			async function writePinned() {
+				const db = await openExisting(STATE_DB, 'ItemTable');
+				if (!db) return false;
+				return new Promise((resolve) => {
+					const tx = db.transaction('ItemTable', 'readwrite');
+					const store = tx.objectStore('ItemTable');
+					const get = store.get(PINNED_KEY);
+					get.onsuccess = () => {
+						const next = window.microbitSession.setPinned(get.result, wanted);
+						store.put(next, PINNED_KEY).onsuccess = () => {
+							stateChannel.postMessage({ changed: new Map([[PINNED_KEY, next]]), deleted: new Set() });
+							resolve(true);
+						};
+					};
+					// A failed read or write must still answer, as a mode switch waits on this.
+					tx.onerror = tx.onabort = () => resolve(false);
+					db.close();
 				});
 			}
 
@@ -82,12 +206,9 @@
 				opts.additionalBuiltinExtensions = product.additionalBuiltinExtensions.map((a) => uriMod.URI.revive(a));
 				if (product.folderUri) {
 					opts.workspaceProvider = {
+						// Always the same folder: switching storage swaps what the `workspace-storage`
+						// extension serves behind it, so nothing ever opens another folder.
 						workspace: { folderUri: uriMod.URI.revive(product.folderUri) },
-						// We never route workspace switching through this — the
-						// `workspace-storage` extension swaps folders in-place via
-						// `vscode.workspace.updateWorkspaceFolders`. The inert
-						// `open: () => true` keeps vscode-web happy if anything
-						// internal ever calls it.
 						open: async () => true,
 						trusted: true,
 					};
@@ -115,13 +236,24 @@
 								return false; // user cancelled or denied
 							}
 							try {
-								await saveLocalFolderHandle(handle);
+								await putIdb(HANDLE_DB, HANDLE_STORE, HANDLE_KEY, handle);
 							} catch (e) {
 								console.error('Failed to persist local folder handle', e);
 								return false;
 							}
 							return true;
 						},
+					},
+					{
+						// Asked before offering a local folder. The feature, not the browser's name,
+						// is what counts: Chromium on Android has the name and not the picker.
+						id: 'microbitIde._canPickLocalFolderHost',
+						handler: () => typeof window.showDirectoryPicker === 'function',
+					},
+					{
+						// Takes `{ [containerId]: pinned }`, returns false when VS Code's storage was not found.
+						id: 'microbitIde._setPinnedHost',
+						handler: setPinned,
 					},
 				];
 				api.create(document.body, opts);

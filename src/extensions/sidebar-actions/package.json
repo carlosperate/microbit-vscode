@@ -13,7 +13,8 @@
 	},
 	"browser": "./dist/extension.js",
 	"extensionDependencies": [
-		"carlosperate.bbcmicrobit-manager"
+		"carlosperate.bbcmicrobit-manager",
+		"carlosperate.microbit-ide-workspace-storage"
 	],
 	"activationEvents": [
 		"onStartupFinished"
@@ -39,6 +40,14 @@
 			{
 				"command": "microbitIde.sidebarActions.showWelcome",
 				"title": "BBC micro:bit IDE: Open the welcome page"
+			},
+			{
+				"command": "microbitIde.sidebarActions.microPythonMode",
+				"title": "BBC micro:bit IDE: Switch to MicroPython mode"
+			},
+			{
+				"command": "microbitIde.sidebarActions.cppMode",
+				"title": "BBC micro:bit IDE: Switch to C++ mode"
 			}
 		],
 		"configuration": {
@@ -57,6 +66,7 @@
 						"Always build this project with the C++ extension."
 					],
 					"default": "auto",
+					"scope": "resource",
 					"description": "Which language the BBC micro:bit IDE's Build & flash button builds the project with."
 				}
 			}
@@ -73,7 +83,7 @@
 		"viewsWelcome": [
 			{
 				"view": "microbitIde.sidebarActions",
-				"contents": "[$(zap) Build & flash project](command:microbitIde.sidebarActions.buildAndFlash)\n[$(terminal) Open serial terminal](command:microbitIde.sidebarActions.openSerialTerminal)\n[Create new project](command:microbitIde.sidebarActions.createProject) · [Show all actions](command:microbitIde.sidebarActions.showAllActions)"
+				"contents": "[$(zap) Build & flash project](command:microbitIde.sidebarActions.buildAndFlash)\n[$(terminal) Open serial terminal](command:microbitIde.sidebarActions.openSerialTerminal)\n\u200b[Show all actions](command:microbitIde.sidebarActions.showAllActions)"
 			}
 		]
 	}

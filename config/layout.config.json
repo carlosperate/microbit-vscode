@@ -19,7 +19,7 @@
 	"extensionState": {
 		"carlosperate.bbcmicrobit-manager": {
 			"bbcmicrobit-manager.combined": false,
-			"bbcmicrobit-manager.panelHidden": true
+			"bbcmicrobit-manager.panelHidden": false
 		}
 	}
 }
