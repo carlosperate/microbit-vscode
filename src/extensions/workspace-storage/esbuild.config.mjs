@@ -16,7 +16,7 @@ const welcomeDir = path.resolve(here, '..', '..', '..', 'welcome-workspace');
  * OS-generated ones like `.DS_Store` but not all dotfiles.
  *
  * Paths use forward slashes and are relative to `welcome-workspace/`. The
- * extension seeds these into `memfs:/welcome/<path>` at activation time.
+ * extension seeds these into the memfs welcome folder at activation time.
  */
 async function collectWelcomeFiles() {
 	let topLevel;
@@ -61,8 +61,8 @@ async function collectWelcomeFiles() {
  * what it needs to pack the extension for the VS Code deployment.
  *
  * Async because it inlines the repo-root `welcome-workspace/` manifest as the
- * `__WELCOME_FILES__` constant read by extension.ts (this extension seeds
- * `memfs:/welcome`).
+ * `__WELCOME_FILES__` constant read by extension.ts, which seeds them into
+ * the memfs welcome folder.
  */
 export async function getBuildOptions() {
 	return {

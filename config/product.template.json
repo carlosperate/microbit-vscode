@@ -11,8 +11,8 @@
 		}
 	},
 	"folderUri": {
-		"scheme": "memfs",
-		"path": "/Welcome workspace"
+		"scheme": "microbit",
+		"path": "/Project"
 	},
 	"configurationDefaults": {
 		"workbench.colorTheme": "micro:bit Pixel Light",

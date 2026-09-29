@@ -48,13 +48,19 @@ export class LocalFS {
 		this.root = handle;
 	}
 
-	hasRoot(): boolean {
-		return !!this.root;
+	/** The picked folder's own name, for the Explorer header's tag. */
+	rootName(): string {
+		return this.requireRoot().name;
 	}
 
 	private requireRoot(): FileSystemDirectoryHandle {
 		if (!this.root) throw new FileNotFound('/ (no folder selected)');
 		return this.root;
+	}
+
+	private inside(p: string): string[] {
+		this.requireRoot();
+		return splitPath(p);
 	}
 
 	private async resolveDir(parts: string[]): Promise<FileSystemDirectoryHandle> {
@@ -72,10 +78,10 @@ export class LocalFS {
 	}
 
 	private async resolveEntry(p: string): Promise<FSHandle> {
-		const parts = splitPath(p);
+		const parts = this.inside(p);
 		if (parts.length === 0) return this.requireRoot();
-		const name = parts.pop()!;
-		const parent = await this.resolveDir(parts);
+		const name = parts[parts.length - 1];
+		const parent = await this.resolveDir(parts.slice(0, -1));
 		try {
 			return await parent.getFileHandle(name);
 		} catch {
@@ -103,7 +109,7 @@ export class LocalFS {
 	}
 
 	async readDirectory(p: string): Promise<[string, EntryType][]> {
-		const dir = await this.resolveDir(splitPath(p));
+		const dir = await this.resolveDir(this.inside(p));
 		const out: [string, EntryType][] = [];
 		for await (const entry of dir.values()) {
 			out.push([entry.name, entry.kind === 'directory' ? 'directory' : 'file']);
@@ -111,18 +117,20 @@ export class LocalFS {
 		return out;
 	}
 
-	async readFile(p: string): Promise<Uint8Array> {
+	private async resolveFile(p: string): Promise<FileSystemFileHandle> {
 		const entry = await this.resolveEntry(p);
 		if (entry.kind !== 'file') throw new FileIsADirectory(p);
-		const file = await entry.getFile();
+		return entry;
+	}
+
+	async readFile(p: string): Promise<Uint8Array> {
+		const file = await (await this.resolveFile(p)).getFile();
 		return new Uint8Array(await file.arrayBuffer());
 	}
 
 	/** Metadata, not a read: these are real files, so a search can skip the big ones cheaply. */
 	async fileSize(p: string): Promise<number> {
-		const entry = await this.resolveEntry(p);
-		if (entry.kind !== 'file') throw new FileIsADirectory(p);
-		return (await entry.getFile()).size;
+		return (await (await this.resolveFile(p)).getFile()).size;
 	}
 
 	/** True when the file was created, which a watcher for new files needs told apart from a change. */
@@ -131,9 +139,9 @@ export class LocalFS {
 		content: Uint8Array,
 		options: { create: boolean; overwrite: boolean }
 	): Promise<boolean> {
-		const parts = splitPath(p);
+		const parts = this.inside(p);
 		const name = parts.pop();
-		if (!name) throw new FileNotFound(p);
+		if (!name) throw new FileIsADirectory(p);
 		const parent = await this.resolveDir(parts);
 		let existing: FileSystemFileHandle | undefined;
 		try {
@@ -154,7 +162,7 @@ export class LocalFS {
 	}
 
 	async createDirectory(p: string): Promise<void> {
-		const parts = splitPath(p);
+		const parts = this.inside(p);
 		const name = parts.pop();
 		if (!name) throw new FileExists(p);
 		const parent = await this.resolveDir(parts);
@@ -169,7 +177,7 @@ export class LocalFS {
 	}
 
 	async delete(p: string, options: { recursive: boolean }): Promise<void> {
-		const parts = splitPath(p);
+		const parts = this.inside(p);
 		const name = parts.pop();
 		if (!name) throw new FileNotFound(p);
 		const parent = await this.resolveDir(parts);

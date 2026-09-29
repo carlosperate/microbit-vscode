@@ -1,7 +1,7 @@
 {
 	"name": "microbit-ide-workspace-storage",
 	"displayName": "micro:bit IDE Workspace Storage",
-	"description": "Provides memfs / idbfs / localfs file-system providers for the micro:bit Web IDE.",
+	"description": "Serves the micro:bit Web IDE's project folder from temporary, browser or local folder storage.",
 	"publisher": "carlosperate",
 	"version": "0.1.0",
 	"private": true,
@@ -12,11 +12,9 @@
 		"vscode": "^1.91.0"
 	},
 	"browser": "./dist/extension.js",
-	"enabledApiProposals": ["fileSearchProvider", "textSearchProvider"],
+	"enabledApiProposals": ["fileSearchProvider", "textSearchProvider", "resolvers"],
 	"activationEvents": [
-		"onFileSystem:memfs",
-		"onFileSystem:idbfs",
-		"onFileSystem:localfs",
+		"onFileSystem:microbit",
 		"onStartupFinished"
 	],
 	"contributes": {
@@ -27,8 +25,32 @@
 			},
 			{
 				"command": "microbitIde.openLocalFolder",
-				"title": "micro:bit IDE: Open Local Folder (File System Access)"
+				"title": "micro:bit IDE: Open Local Folder"
+			},
+			{
+				"command": "microbitIde.useBrowserStorage",
+				"title": "micro:bit IDE: Switch to Browser Storage"
+			},
+			{
+				"command": "microbitIde.useTemporaryStorage",
+				"title": "micro:bit IDE: Switch to Temporary Storage"
 			}
-		]
+		],
+		"menus": {
+			"statusBar/remoteIndicator": [
+				{
+					"command": "microbitIde.useTemporaryStorage",
+					"group": "virtualfs_10_microbit_storage@1"
+				},
+				{
+					"command": "microbitIde.useBrowserStorage",
+					"group": "virtualfs_10_microbit_storage@2"
+				},
+				{
+					"command": "microbitIde.openLocalFolder",
+					"group": "virtualfs_10_microbit_storage@3"
+				}
+			]
+		}
 	}
 }
