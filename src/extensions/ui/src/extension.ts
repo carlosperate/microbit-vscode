@@ -10,12 +10,12 @@ const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
 const STORAGE_EXTENSION = 'carlosperate.microbit-ide-workspace-storage';
 const MANAGER_API_VERSION = '0.3.0';
 
-const VIEW_ID = 'microbitIde.sidebarActions';
-const EXPANDED_ONCE = 'microbitIde.sidebarActions.expandedOnce';
-const SIZES_SETTLED = 'microbitIde.sidebarActions.sizesSettled';
+const VIEW_ID = 'microbitIde.ui.actions';
+const EXPANDED_ONCE = 'microbitIde.ui.actions.expandedOnce';
+const SIZES_SETTLED = 'microbitIde.ui.actions.sizesSettled';
 const WELCOME_VIEW_TYPE = 'microbitIde.welcome';
-const MICROPYTHON_MODE = 'microbitIde.sidebarActions.microPythonMode';
-const CPP_MODE = 'microbitIde.sidebarActions.cppMode';
+const MICROPYTHON_MODE = 'microbitIde.ui.microPythonMode';
+const CPP_MODE = 'microbitIde.ui.cppMode';
 
 // Registered by public/index.html, since no VS Code API pins an activity bar container.
 const SET_PINNED_HOST = 'microbitIde._setPinnedHost';
@@ -25,8 +25,8 @@ declare const __WELCOME_HTML__: string;
 
 /** The page can ask for these and nothing else, so its markup can never widen what it reaches. */
 const WELCOME_COMMANDS = new Set([
-	'microbitIde.sidebarActions.buildAndFlash',
-	'microbitIde.sidebarActions.openSerialTerminal',
+	'microbitIde.ui.buildAndFlash',
+	'microbitIde.ui.openSerialTerminal',
 	'microbitIde.openLocalFolder',
 	'microbitIde.switchStorage',
 	'microbitIde.useBrowserStorage',
@@ -84,11 +84,11 @@ export function activate(context: vscode.ExtensionContext): void {
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('microbitIde.sidebarActions.buildAndFlash', () => buildAndFlash()),
-		vscode.commands.registerCommand('microbitIde.sidebarActions.openSerialTerminal', () => run(OPEN_TERMINAL)),
-		vscode.commands.registerCommand('microbitIde.sidebarActions.showAllActions', () => run(SHOW_MENU)),
-		vscode.commands.registerCommand('microbitIde.sidebarActions.createProject', () => createProject()),
-		vscode.commands.registerCommand('microbitIde.sidebarActions.showWelcome', () => showWelcome()),
+		vscode.commands.registerCommand('microbitIde.ui.buildAndFlash', () => buildAndFlash()),
+		vscode.commands.registerCommand('microbitIde.ui.openSerialTerminal', () => run(OPEN_TERMINAL)),
+		vscode.commands.registerCommand('microbitIde.ui.showAllActions', () => run(SHOW_MENU)),
+		vscode.commands.registerCommand('microbitIde.ui.createProject', () => createProject()),
+		vscode.commands.registerCommand('microbitIde.ui.showWelcome', () => showWelcome()),
 		vscode.commands.registerCommand(MICROPYTHON_MODE, () => switchMode('micropython')),
 		vscode.commands.registerCommand(CPP_MODE, () => switchMode('cpp'))
 	);
@@ -150,16 +150,16 @@ function registerStatusBarMenu(context: vscode.ExtensionContext): void {
 			api.registerMenuGroup({
 				label: 'BBC micro:bit IDE',
 				commands: [
-					{ command: 'microbitIde.sidebarActions.showWelcome', label: 'Open the welcome page' },
+					{ command: 'microbitIde.ui.showWelcome', label: 'Open the welcome page' },
 					{ command: MICROPYTHON_MODE, label: 'Switch to MicroPython mode' },
 					{ command: CPP_MODE, label: 'Switch to C++ mode' },
-					{ command: 'microbitIde.sidebarActions.createProject', label: 'Create new project' },
+					{ command: 'microbitIde.ui.createProject', label: 'Create new project' },
 					{ command: 'microbitIde.switchStorage', label: 'Switch workspace storage' },
 				],
 			})
 		);
 	} catch (error) {
-		console.warn(`[sidebar-actions] the micro:bit Manager refused the menu group: ${String(error)}`);
+		console.warn(`[microbit-ide-ui] the micro:bit Manager refused the menu group: ${String(error)}`);
 	}
 }
 
@@ -167,7 +167,7 @@ function registerStatusBarMenu(context: vscode.ExtensionContext): void {
 function managerApi(candidate: unknown): MicrobitManagerApi | undefined {
 	const served = (candidate as { version?: unknown } | undefined)?.version;
 	if (!compatibleApiVersion(served, MANAGER_API_VERSION)) {
-		console.warn(`[sidebar-actions] micro:bit Manager API ${String(served)} is not ${MANAGER_API_VERSION}, menu entries skipped`);
+		console.warn(`[microbit-ide-ui] micro:bit Manager API ${String(served)} is not ${MANAGER_API_VERSION}, menu entries skipped`);
 		return undefined;
 	}
 	return candidate as MicrobitManagerApi;
@@ -226,7 +226,7 @@ const setTheme = (theme: string) =>
 /** Without the page's bridge the activity bar just stays as it is. */
 async function pin(changes: Record<string, boolean>): Promise<void> {
 	const pinned = await Promise.resolve(vscode.commands.executeCommand<boolean>(SET_PINNED_HOST, changes)).catch(() => false);
-	if (!pinned) console.warn('[sidebar-actions] the page could not pin the micro:bit sidebars');
+	if (!pinned) console.warn('[microbit-ide-ui] the page could not pin the micro:bit sidebars');
 }
 
 /** In turn with a storage switch or another mode, either of which would change the files under this one. */

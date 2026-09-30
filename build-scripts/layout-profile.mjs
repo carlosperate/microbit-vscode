@@ -43,10 +43,10 @@ export function profileFromLayout(layout) {
 
 	const extensionState = { ...layout?.extensionState };
 	// The sidebar's startup focus command would otherwise reveal a hidden view.
-	if (layout?.explorerViews?.some((view) => view.id === 'microbitIde.sidebarActions' && view.hidden === true)) {
-		extensionState['carlosperate.microbit-ide-sidebar-actions'] = {
-			...extensionState['carlosperate.microbit-ide-sidebar-actions'],
-			'microbitIde.sidebarActions.expandedOnce': true,
+	if (layout?.explorerViews?.some((view) => view.id === 'microbitIde.ui.actions' && view.hidden === true)) {
+		extensionState['carlosperate.microbit-ide-ui'] = {
+			...extensionState['carlosperate.microbit-ide-ui'],
+			'microbitIde.ui.actions.expandedOnce': true,
 		};
 	}
 	// Keep each extension's globalState consistent with the seeded layout.

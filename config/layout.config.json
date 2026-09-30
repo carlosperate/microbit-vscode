@@ -10,7 +10,7 @@
 		{ "id": "workbench.view.extension.bbcmicrobit", "hidden": true }
 	],
 	"explorerViews": [
-		{ "id": "microbitIde.sidebarActions" },
+		{ "id": "microbitIde.ui.actions" },
 		{ "id": "workbench.explorer.fileView" },
 		{ "id": "outline" },
 		{ "id": "timeline", "hidden": true },

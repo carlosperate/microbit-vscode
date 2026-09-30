@@ -9,6 +9,6 @@ describe('the BBC micro:bit IDE panel', () => {
 	// VS Code draws a line that is nothing but a link as a button, and any other as text with links.
 	it('shows the two actions as buttons and Show all actions as a link', () => {
 		expect(lines.map((line) => loneLink.test(line))).toEqual([true, true, false]);
-		expect(lines[2]).toContain('[Show all actions](command:microbitIde.sidebarActions.showAllActions)');
+		expect(lines[2]).toContain('[Show all actions](command:microbitIde.ui.showAllActions)');
 	});
 });

@@ -1,4 +1,4 @@
-/** What this extension exports, for `sidebar-actions`. Types only, so importing it bundles nothing. */
+/** What this extension exports, for the `ui` extension. Types only, so importing it bundles nothing. */
 import type * as vscode from 'vscode';
 
 import type { Storage } from './switch.js';

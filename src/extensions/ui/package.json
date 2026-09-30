@@ -1,7 +1,7 @@
 {
-	"name": "microbit-ide-sidebar-actions",
-	"displayName": "BBC micro:bit IDE Sidebar Actions",
-	"description": "Sidebar buttons for the micro:bit Web IDE.",
+	"name": "microbit-ide-ui",
+	"displayName": "BBC micro:bit IDE UI",
+	"description": "The micro:bit Web IDE's own interface: the welcome page, the language modes and the quick actions.",
 	"publisher": "carlosperate",
 	"version": "0.1.0",
 	"private": true,
@@ -22,31 +22,31 @@
 	"contributes": {
 		"commands": [
 			{
-				"command": "microbitIde.sidebarActions.buildAndFlash",
+				"command": "microbitIde.ui.buildAndFlash",
 				"title": "BBC micro:bit IDE: Build & flash project"
 			},
 			{
-				"command": "microbitIde.sidebarActions.openSerialTerminal",
+				"command": "microbitIde.ui.openSerialTerminal",
 				"title": "BBC micro:bit IDE: Open serial terminal"
 			},
 			{
-				"command": "microbitIde.sidebarActions.showAllActions",
+				"command": "microbitIde.ui.showAllActions",
 				"title": "BBC micro:bit IDE: Show all actions"
 			},
 			{
-				"command": "microbitIde.sidebarActions.createProject",
+				"command": "microbitIde.ui.createProject",
 				"title": "BBC micro:bit IDE: Create new project"
 			},
 			{
-				"command": "microbitIde.sidebarActions.showWelcome",
+				"command": "microbitIde.ui.showWelcome",
 				"title": "BBC micro:bit IDE: Open the welcome page"
 			},
 			{
-				"command": "microbitIde.sidebarActions.microPythonMode",
+				"command": "microbitIde.ui.microPythonMode",
 				"title": "BBC micro:bit IDE: Switch to MicroPython mode"
 			},
 			{
-				"command": "microbitIde.sidebarActions.cppMode",
+				"command": "microbitIde.ui.cppMode",
 				"title": "BBC micro:bit IDE: Switch to C++ mode"
 			}
 		],
@@ -74,7 +74,7 @@
 		"views": {
 			"explorer": [
 				{
-					"id": "microbitIde.sidebarActions",
+					"id": "microbitIde.ui.actions",
 					"name": "BBC micro:bit IDE",
 					"visibility": "visible"
 				}
@@ -82,8 +82,8 @@
 		},
 		"viewsWelcome": [
 			{
-				"view": "microbitIde.sidebarActions",
-				"contents": "[$(zap) Build & flash project](command:microbitIde.sidebarActions.buildAndFlash)\n[$(terminal) Open serial terminal](command:microbitIde.sidebarActions.openSerialTerminal)\n\u200b[Show all actions](command:microbitIde.sidebarActions.showAllActions)"
+				"view": "microbitIde.ui.actions",
+				"contents": "[$(zap) Build & flash project](command:microbitIde.ui.buildAndFlash)\n[$(terminal) Open serial terminal](command:microbitIde.ui.openSerialTerminal)\n\u200b[Show all actions](command:microbitIde.ui.showAllActions)"
 			}
 		]
 	}

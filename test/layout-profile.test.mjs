@@ -60,25 +60,25 @@ describe('profileFromLayout', () => {
 
 	it('suppresses startup expansion for hidden sidebar actions without losing other extension state', () => {
 		const storage = storageOf(profileFromLayout({
-			explorerViews: [{ id: 'microbitIde.sidebarActions', hidden: true }],
+			explorerViews: [{ id: 'microbitIde.ui.actions', hidden: true }],
 			extensionState: {
-				'carlosperate.microbit-ide-sidebar-actions': {
-					'microbitIde.sidebarActions.expandedOnce': false,
+				'carlosperate.microbit-ide-ui': {
+					'microbitIde.ui.actions.expandedOnce': false,
 					other: 'preserved',
 				},
 			},
 		}));
-		expect(JSON.parse(storage['carlosperate.microbit-ide-sidebar-actions'])).toEqual({
-			'microbitIde.sidebarActions.expandedOnce': true,
+		expect(JSON.parse(storage['carlosperate.microbit-ide-ui'])).toEqual({
+			'microbitIde.ui.actions.expandedOnce': true,
 			other: 'preserved',
 		});
 	});
 
 	it.each([undefined, false])('keeps startup expansion for shown sidebar actions (hidden: %s)', (hidden) => {
 		const storage = storageOf(profileFromLayout({
-			explorerViews: [{ id: 'microbitIde.sidebarActions', hidden }],
+			explorerViews: [{ id: 'microbitIde.ui.actions', hidden }],
 		}));
-		expect(storage['carlosperate.microbit-ide-sidebar-actions']).toBeUndefined();
+		expect(storage['carlosperate.microbit-ide-ui']).toBeUndefined();
 	});
 
 	describe('view containers', () => {
