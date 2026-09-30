@@ -47,6 +47,13 @@ describe('profileFromLayout', () => {
 		]);
 	});
 
+	// VS Code keeps this one as the text of a boolean, and shows the icon when the key is absent.
+	it('hides the Accounts icon only when the layout says so', () => {
+		expect(storageOf(profileFromLayout({ accounts: { hidden: true } }))['workbench.activity.showAccounts']).toBe('false');
+		expect(profileFromLayout({ accounts: { hidden: false } })).toBeUndefined();
+		expect(profileFromLayout({ accounts: {} })).toBeUndefined();
+	});
+
 	it('numbers explorer views in order and defaults them to shown', () => {
 		const option = profileFromLayout({
 			explorerViews: [{ id: 'mine' }, { id: 'files' }, { id: 'openEditors', hidden: true }],

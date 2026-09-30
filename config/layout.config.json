@@ -9,6 +9,7 @@
 		{ "id": "workbench.view.extension.bbcmicrobit-cpp" },
 		{ "id": "workbench.view.extension.bbcmicrobit", "hidden": true }
 	],
+	"accounts": { "hidden": true },
 	"explorerViews": [
 		{ "id": "microbitIde.ui.actions" },
 		{ "id": "workbench.explorer.fileView" },

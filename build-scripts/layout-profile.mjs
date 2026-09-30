@@ -8,9 +8,13 @@ const PROFILE_NAME = 'Default';
 
 const ACTIVITY_BAR_KEY = 'workbench.activity.pinnedViewlets2';
 const EXPLORER_VIEWS_KEY = 'workbench.explorer.views.state.hidden';
+const ACCOUNTS_KEY = 'workbench.activity.showAccounts';
 
 export function profileFromLayout(layout) {
 	const storage = {};
+
+	// Shown unless the key says otherwise, and VS Code reads it as the text of a boolean.
+	if (layout?.accounts?.hidden === true) storage[ACCOUNTS_KEY] = 'false';
 
 	if (layout?.activityBar?.length) {
 		// Omitted entries get pinned by VS Code, so hidden entries must stay in the seed.
