@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeTheme, type Mode } from '../src/mode';
+import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeStarters, modeTheme, type Mode } from '../src/mode';
 
 const MODES: Mode[] = ['micropython', 'cpp'];
 
@@ -38,6 +38,18 @@ describe('modeContainer', () => {
 		expect(modePins('micropython')[modeContainer('micropython')]).toBe(true);
 		expect(modePins('cpp')[modeContainer('cpp')]).toBe(true);
 		expect(modeContainer('cpp')).not.toBe(modeContainer('micropython'));
+	});
+});
+
+describe('modeStarters', () => {
+	it('looks for main.py in the MicroPython project folder', () => {
+		expect(modeStarters('micropython', [])).toEqual([['main.py']]);
+		expect(modeStarters('micropython', ['src'])).toEqual([['src', 'main.py']]);
+	});
+
+	// The C++ extension wrote main.cpp at the root before it moved it into source/.
+	it('looks for main.cpp in source first, then at the root, whatever the Python folder is', () => {
+		expect(modeStarters('cpp', ['src'])).toEqual([['source', 'main.cpp'], ['main.cpp']]);
 	});
 });
 

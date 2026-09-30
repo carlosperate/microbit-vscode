@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { detectLanguage, scanSignals, type Entry, type Language, type ReadDirectory } from './detect';
 import { compatibleApiVersion } from './managerVersion';
 import type { StorageApi } from '../../workspace-storage/src/api';
-import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeTheme, type Mode } from './mode';
+import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeStarters, modeTheme, type Mode } from './mode';
 
 const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
 const STORAGE_EXTENSION = 'carlosperate.microbit-ide-workspace-storage';
@@ -37,31 +37,22 @@ const WELCOME_COMMANDS = new Set([
 ]);
 
 /**
- * An answer given to the picker, for this run of the IDE only. A workspace URI
- * outlives the project in it, so a stored answer would follow a folder into
- * whatever the user opens there next week. The pin button writes the setting.
- */
-let answered: Language | undefined;
-
-/**
  * The language extensions own building and the manager owns the board, so every
  * button here is a command someone else registered. Each is checked for before
  * it runs, never assumed from which app we are in.
  */
-const LANGUAGES: Record<Language, { label: string; detail: string; flash: string; create: string; main: string }> = {
+const LANGUAGES: Record<Language, { label: string; detail: string; flash: string; create: string }> = {
 	micropython: {
 		label: 'MicroPython',
 		detail: 'Python files flashed onto the board',
 		flash: 'bbcmicrobit-micropython.flash',
 		create: 'bbcmicrobit-micropython.createProject',
-		main: 'main.py',
 	},
 	cpp: {
 		label: 'C++',
 		detail: 'C++ sources compiled with CODAL',
 		flash: 'bbcmicrobit-cpp.flash',
 		create: 'bbcmicrobit-cpp.createProject',
-		main: 'main.cpp',
 	},
 };
 
@@ -103,23 +94,43 @@ export function activate(context: vscode.ExtensionContext): void {
 	// serializer registered, VS Code never saves the tab, so a session never has two.
 	showWelcome();
 
-	// The folder never changes, so a change of storage is what puts another project in it.
-	const forgetAnswer = storageApi()?.onDidChangeStorage(() => {
-		answered = undefined;
-	});
-	if (forgetAnswer) context.subscriptions.push(forgetAnswer);
-
 	registerStatusBarMenu(context);
 
+	// As early as the layout allows: the shorter this wait, the less chance of catching someone mid-action.
+	setTimeout(() => {
+		arrangeSidebar(context).catch((error: unknown) => console.warn(`[microbit-ide-ui] the sidebar was not arranged: ${String(error)}`));
+	}, 300);
+}
+
+/** Both steps move the focus, so one runs after the other. */
+async function arrangeSidebar(context: vscode.ExtensionContext): Promise<void> {
+	await showStarterFolders();
 	// Per workspace, since that is where VS Code keeps the sizes being settled.
-	if (!context.workspaceState.get<boolean>(SIZES_SETTLED)) {
-		// As early as the layout allows: the shorter this wait, the less chance of catching someone mid-action.
-		setTimeout(() => {
-			void settleSidebarSizes().then((settled) => {
-				if (settled) void context.workspaceState.update(SIZES_SETTLED, true);
-			});
-		}, 300);
+	if (!context.workspaceState.get<boolean>(SIZES_SETTLED) && (await settleSidebarSizes())) {
+		void context.workspaceState.update(SIZES_SETTLED, true);
 	}
+}
+
+/**
+ * A temporary session keeps nothing of the last one, so its Explorer starts with every folder
+ * closed and a starter program inside one is out of sight. Kept storage restores its own tree.
+ */
+async function showStarterFolders(): Promise<void> {
+	const root = projectFolder()?.uri;
+	if (!root || vscode.window.activeTextEditor || storageApi()?.storage() !== 'memfs') return;
+	let revealed = false;
+	for (const mode of Object.keys(LANGUAGES) as Mode[]) {
+		const [segments] = modeStarters(mode, projectSegments(root));
+		const starter = vscode.Uri.joinPath(root, ...segments);
+		if (segments.length > 1 && (await exists(starter))) {
+			await vscode.commands.executeCommand('revealInExplorer', starter);
+			revealed = true;
+		}
+	}
+	if (!revealed) return;
+	// Revealing selects the file and takes the focus, and a fresh start wants neither.
+	await vscode.commands.executeCommand('list.clear');
+	await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
 }
 
 /**
@@ -283,16 +294,20 @@ const exists = (uri: vscode.Uri) =>
 
 /** The language extension writes its own template, never over a file; an existing one is just opened. */
 async function openStarter(mode: Mode, root: vscode.Uri): Promise<void> {
-	const folder = mode === 'micropython' ? vscode.Uri.joinPath(root, ...projectSegments(root)) : root;
-	const main = vscode.Uri.joinPath(folder, LANGUAGES[mode].main);
-	if (await exists(main)) {
-		await vscode.window.showTextDocument(main);
+	const places = modeStarters(mode, projectSegments(root)).map((segments) => vscode.Uri.joinPath(root, ...segments));
+	const starter = async () => {
+		for (const place of places) if (await exists(place)) return place;
+		return undefined;
+	};
+	const present = await starter();
+	if (present) {
+		await vscode.window.showTextDocument(present);
 		return;
 	}
 	// C++ takes the folder, MicroPython always uses its configured project folder.
 	await vscode.commands.executeCommand(LANGUAGES[mode].create, ...(mode === 'cpp' ? [root] : []));
 	// Both report a failure themselves and return, so only the file says whether it worked.
-	if (!(await exists(main))) throw new Error(`${LANGUAGES[mode].main} was not created.`);
+	if (!(await starter())) throw new Error('The starter program was not created.');
 }
 
 async function buildAndFlash(): Promise<void> {
@@ -353,9 +368,8 @@ async function run(command: string, known?: Set<string>): Promise<void> {
 }
 
 /**
- * The setting wins, then what the files say, then an answer already given. The
- * files come before that answer so editing the project, or opening a different
- * one, corrects a stale choice rather than being overruled by it.
+ * The setting wins, then what the files say. A project they leave undecided is
+ * asked about every time, as one holding both languages may mean either.
  */
 async function resolveLanguage(installed: Language[]): Promise<Language | undefined> {
 	// Before the single-language shortcut: asking for a language that is not here
@@ -382,7 +396,6 @@ async function resolveLanguage(installed: Language[]): Promise<Language | undefi
 		: undefined;
 	if (detected && installed.includes(detected)) return detected;
 
-	if (answered && installed.includes(answered)) return answered;
 	return ask(installed);
 }
 
@@ -396,7 +409,7 @@ const toItem = (language: Language): LanguageItem => ({
 	language,
 });
 
-/** Picking answers for this session only; the pin button on each row writes the setting. */
+/** Picking answers this once; the pin button on each row writes the setting. */
 function ask(installed: Language[]): Promise<Language | undefined> {
 	return new Promise((resolve) => {
 		const pick = vscode.window.createQuickPick<LanguageItem>();
@@ -431,7 +444,6 @@ function ask(installed: Language[]): Promise<Language | undefined> {
 		pick.onDidHide(() => {
 			hidden = true;
 			pick.dispose();
-			if (chosen) answered = chosen;
 			resolve(chosen);
 		});
 

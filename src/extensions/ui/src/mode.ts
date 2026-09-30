@@ -35,5 +35,12 @@ export const modePins = (mode: Mode): Record<string, boolean> => ({
 	[CONTAINERS.cpp]: mode === 'cpp',
 });
 
+/**
+ * Where a mode's starter program may be, as path segments below the folder, likeliest first.
+ * C++ has two: its extension wrote main.cpp at the root before it moved it into source/.
+ */
+export const modeStarters = (mode: Mode, pythonFolder: string[]): string[][] =>
+	mode === 'micropython' ? [[...pythonFolder, 'main.py']] : [['source', 'main.cpp'], ['main.cpp']];
+
 // C++ builds from the Explorer, whose micro:bit panel flashes whichever language the files are.
 export const modeSidebar = (mode: Mode): string => (mode === 'micropython' ? CONTAINERS.micropython : 'workbench.view.explorer');
