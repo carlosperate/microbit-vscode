@@ -14,6 +14,7 @@
     "check:extensions": "node build-scripts/fetch-openvsx.mjs --check",
     "dev": "node build-scripts/dev-server.mjs",
     "dev:serve": "node build-scripts/dev-server.mjs --no-browser",
+    "render:hero": "node build-scripts/render-hero.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "rimraf .cache dist"
