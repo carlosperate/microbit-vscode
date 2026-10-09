@@ -37,8 +37,8 @@ This project wouldn't be possible without the following open source projects:
   [VS Code micro:bit C++](https://github.com/carlosperate/vscode-microbit-cpp),
   [VS Code micro:bit Themes](https://github.com/carlosperate/vscode-microbit-themes),
   [VS Code MicroPython LSP](https://github.com/carlosperate/vscode-micropython-lsp),
-  [VS Code Serial Monitor](https://github.com/eclipse-cdt-cloud/vscode-serial-monitor).
-  [VS Code C/C++- Themes](https://github.com/Microsoft/vscode-cpptools)
+  [VS Code Serial Monitor](https://github.com/eclipse-cdt-cloud/vscode-serial-monitor),
+  [VS Code C/C++- Themes](https://github.com/Microsoft/vscode-cpptools).
 - And the micro:bit related projects these VS extensions were built on top of:
   [microbit-clang-wasm](https://github.com/carlosperate/microbit-clang-wasm),
   [microbit-clang-wasm-codal](https://github.com/carlosperate/microbit-clang-wasm-codal),
