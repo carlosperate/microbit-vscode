@@ -9,6 +9,7 @@ pre-configured for BBC micro:bit MicroPython and C++ development.
 
 https://carlosperate.github.io/microbit-vscode/
 
+Add [`?mode=micropython`](https://carlosperate.github.io/microbit-vscode/?mode=micropython) or [`?mode=cpp`](https://carlosperate.github.io/microbit-vscode/?mode=cpp) to the link to open the IDE in that language's mode.
 
 ## Run locally
 

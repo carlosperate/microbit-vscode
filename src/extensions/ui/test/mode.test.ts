@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeStarters, modeTheme, type Mode } from '../src/mode';
+import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeStarters, modeTheme, toMode, type Mode } from '../src/mode';
 
 const MODES: Mode[] = ['micropython', 'cpp'];
 
@@ -57,5 +57,25 @@ describe('modeSidebar', () => {
 	it('opens the MicroPython sidebar, or the Explorer for C++', () => {
 		expect(modeSidebar('micropython')).toBe('workbench.view.extension.bbcmicrobit-micropython');
 		expect(modeSidebar('cpp')).toBe('workbench.view.explorer');
+	});
+});
+
+describe('toMode', () => {
+	// Links get typed by hand, so the case is not held against them.
+	it('reads either mode, in any case', () => {
+		expect(toMode('micropython')).toBe('micropython');
+		expect(toMode('MicroPython')).toBe('micropython');
+		expect(toMode('cpp')).toBe('cpp');
+		expect(toMode('CPP')).toBe('cpp');
+	});
+
+	// `auto` is the projectLanguage setting's way of naming none.
+	it('ignores anything else, a missing parameter and auto included', () => {
+		expect(toMode(null)).toBeUndefined();
+		expect(toMode(undefined)).toBeUndefined();
+		expect(toMode('')).toBeUndefined();
+		expect(toMode('auto')).toBeUndefined();
+		expect(toMode('python')).toBeUndefined();
+		expect(toMode(42)).toBeUndefined();
 	});
 });

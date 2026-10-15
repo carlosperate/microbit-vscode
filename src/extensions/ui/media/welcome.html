@@ -68,8 +68,9 @@
 				border-radius: 14px;
 				color: #ffffff;
 			}
-			button.mode.micropython { --mode: #6c4bc1; --mode-deep: #4a3192; --mode-end: #3c67d6; }
-			button.mode.cpp { --mode: #cd0365; --mode-deep: #8f0247; --mode-end: #ef5a2b; }
+			/* The tint is the mode's Dark theme accent, for text in its colour on a dark editor. */
+			.micropython { --mode: #6c4bc1; --mode-deep: #4a3192; --mode-end: #3c67d6; --mode-tint: #b4a3e8; }
+			.cpp { --mode: #cd0365; --mode-deep: #8f0247; --mode-end: #ef5a2b; --mode-tint: #f08aa8; }
 			.mode-name { display: block; font-size: 20px; font-weight: 700; line-height: 1.2; }
 			.mode-detail { display: block; margin-top: 4px; font-size: 13px; opacity: 0.92; }
 
@@ -87,6 +88,22 @@
 			.leds i.on { background: rgba(255, 255, 255, 0.6); }
 			button.mode:is(:hover, :focus-visible) .leds i { transition-delay: calc(var(--n) * 12ms); }
 			button.mode:is(:hover, :focus-visible) .leds i.on { background: #ffffff; box-shadow: 0 0 10px 2px rgba(255, 255, 255, 0.9); }
+
+			/* The mode in use lies flat and outlined, so the other is the key that stands out. */
+			button.mode[aria-current='true'] {
+				--face: color-mix(in srgb, var(--mode) 7%, var(--vscode-editor-background));
+				color: var(--mode-ink, var(--mode-deep));
+				box-shadow: inset 0 0 0 2px var(--mode);
+				transform: none;
+			}
+			body:is(.vscode-dark, .vscode-high-contrast):not(.vscode-high-contrast-light) button.mode { --mode-ink: var(--mode-tint); }
+			button.mode[aria-current='true']:hover { --face: color-mix(in srgb, var(--mode) 12%, var(--vscode-editor-background)); }
+			.when-current, .when-other, .leds.tick, button.mode[aria-current='true'] .leds:not(.tick) { display: none; }
+			button.mode[aria-current='true'] .when-current, .keys:has([aria-current]) button.mode:not([aria-current]) .when-other { display: inline; }
+			button.mode[aria-current='true'] .leds.tick { display: grid; }
+			button.mode[aria-current='true'] .leds i { background: color-mix(in srgb, var(--mode) 15%, transparent); }
+			button.mode[aria-current='true'] .leds i.on { background: var(--mode); box-shadow: none; }
+			.pill { display: inline-block; margin-left: 5px; padding: 3px 10px; border-radius: 999px; font-weight: 700; color: #ffffff; background: var(--mode); }
 
 			/* Smaller keys, in the button colours of the theme in use. */
 			button.store {
@@ -358,17 +375,21 @@
 			<header class="hero">
 				<h1>Welcome to the BBC micro:bit Web IDE</h1>
 				<p>Write code, send it to a BBC micro:bit, and watch it run. MicroPython or C++ projects, all in the browser.</p>
-				<p class="group">Language Mode</p>
+				<p class="group">
+					Language Mode<span data-mode-tag="micropython" hidden>: <span class="pill micropython">MicroPython</span></span><span data-mode-tag="cpp" hidden>: <span class="pill cpp">C++</span></span>
+				</p>
 				<div class="keys">
-					<button class="key mode micropython" data-command="microbitIde.ui.microPythonMode">
-						<span class="mode-name">MicroPython mode</span>
-						<span class="mode-detail">Python, with a built-in board simulator</span>
+					<button class="key mode micropython" data-command="microbitIde.ui.microPythonMode" data-mode="micropython">
+						<span class="mode-name"><span class="when-other">Switch to </span>MicroPython mode</span>
+						<span class="mode-detail"><span class="when-current">In use: </span>Python, with a built-in board simulator</span>
 						<span class="leds" data-leds="0101011111111110111000100" aria-hidden="true"></span>
+						<span class="leds tick" data-leds="0000000001000101010001000" aria-hidden="true"></span>
 					</button>
-					<button class="key mode cpp" data-command="microbitIde.ui.cppMode">
-						<span class="mode-name">C++ mode</span>
-						<span class="mode-detail">C++ built with CODAL, the micro:bit runtime</span>
+					<button class="key mode cpp" data-command="microbitIde.ui.cppMode" data-mode="cpp">
+						<span class="mode-name"><span class="when-other">Switch to </span>C++ mode</span>
+						<span class="mode-detail"><span class="when-current">In use: </span>C++ built with CODAL, the micro:bit runtime</span>
 						<span class="leds" data-leds="0010000100111110010000100" aria-hidden="true"></span>
+						<span class="leds tick" data-leds="0000000001000101010001000" aria-hidden="true"></span>
 					</button>
 				</div>
 				<p class="group">
@@ -680,11 +701,20 @@
 					leds.append(led);
 				});
 			}
-			// Only the name and the button that fit the storage in use are shown.
 			addEventListener('message', ({ data }) => {
-				if (data?.type !== 'storage' || typeof data.storage !== 'string') return;
-				for (const element of document.querySelectorAll('[data-storage]')) {
-					element.hidden = !element.dataset.storage.split(' ').includes(data.storage);
+				// Only the name and the button that fit the storage in use are shown.
+				if (data?.type === 'storage' && typeof data.storage === 'string') {
+					for (const element of document.querySelectorAll('[data-storage]')) {
+						element.hidden = !element.dataset.storage.split(' ').includes(data.storage);
+					}
+				}
+				// Until a mode is applied neither key is current, and both read as they always have.
+				if (data?.type === 'mode') {
+					for (const key of document.querySelectorAll('button[data-mode]')) {
+						if (key.dataset.mode === data.mode) key.setAttribute('aria-current', 'true');
+						else key.removeAttribute('aria-current');
+					}
+					for (const tag of document.querySelectorAll('[data-mode-tag]')) tag.hidden = tag.dataset.modeTag !== data.mode;
 				}
 			});
 			vscode.postMessage({ type: 'ready' });

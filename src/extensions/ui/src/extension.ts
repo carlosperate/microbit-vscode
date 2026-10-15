@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import { detectLanguage, scanSignals, type Entry, type Language, type ReadDirectory } from './detect';
 import { compatibleApiVersion } from './managerVersion';
 import type { StorageApi } from '../../workspace-storage/src/api';
-import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeStarters, modeTheme, type Mode } from './mode';
+import { MICROBIT_THEMES, modeContainer, modePins, modeSidebar, modeStarters, modeTheme, toMode, type Mode } from './mode';
 
 const MANAGER_EXTENSION = 'carlosperate.bbcmicrobit-manager';
 const STORAGE_EXTENSION = 'carlosperate.microbit-ide-workspace-storage';
@@ -16,9 +16,15 @@ const SIZES_SETTLED = 'microbitIde.ui.actions.sizesSettled';
 const WELCOME_VIEW_TYPE = 'microbitIde.welcome';
 const MICROPYTHON_MODE = 'microbitIde.ui.microPythonMode';
 const CPP_MODE = 'microbitIde.ui.cppMode';
+// The last mode applied, and the last one a link applied. A memfs session starts without
+// them, as public/index.html clears VS Code's state, unless another IDE tab is open.
+const MODE_KEY = 'microbitIde.ui.mode';
+const LINKED_KEY = 'microbitIde.ui.linkedMode';
 
 // Registered by public/index.html, since no VS Code API pins an activity bar container.
 const SET_PINNED_HOST = 'microbitIde._setPinnedHost';
+// Also public/index.html's, as the page's own URL is out of this worker's reach.
+const LINKED_MODE_HOST = 'microbitIde._getLinkedModeHost';
 
 // The welcome page's markup, inlined at build time by `esbuild.config.mjs`.
 declare const __WELCOME_HTML__: string;
@@ -41,16 +47,18 @@ const WELCOME_COMMANDS = new Set([
  * button here is a command someone else registered. Each is checked for before
  * it runs, never assumed from which app we are in.
  */
-const LANGUAGES: Record<Language, { label: string; detail: string; flash: string; create: string }> = {
+const LANGUAGES: Record<Language, { label: string; detail: string; extension: string; flash: string; create: string }> = {
 	micropython: {
 		label: 'MicroPython',
 		detail: 'Python files flashed onto the board',
+		extension: 'carlosperate.bbcmicrobit-micropython',
 		flash: 'bbcmicrobit-micropython.flash',
 		create: 'bbcmicrobit-micropython.createProject',
 	},
 	cpp: {
 		label: 'C++',
 		detail: 'C++ sources compiled with CODAL',
+		extension: 'carlosperate.bbcmicrobit-cpp',
 		flash: 'bbcmicrobit-cpp.flash',
 		create: 'bbcmicrobit-cpp.createProject',
 	},
@@ -62,8 +70,15 @@ const SHOW_MENU = 'bbcmicrobit-manager.showMenu';
 const fail = (message: string) => void vscode.window.showErrorMessage(`BBC micro:bit IDE: ${message}`);
 const warn = (message: string) => void vscode.window.showWarningMessage(`BBC micro:bit IDE: ${message}`);
 
-/** Fetched once per action: it is a round trip to the main thread, not a local lookup. */
-const registeredCommands = async () => new Set(await vscode.commands.getCommands(true));
+/**
+ * Fetched once per action: it is a round trip to the main thread, not a local lookup. The language
+ * extensions activate on startup too, so just after it their commands may not be registered yet.
+ */
+async function registeredCommands(): Promise<Set<string>> {
+	const languages = Object.values(LANGUAGES).map(({ extension }) => vscode.extensions.getExtension(extension)?.activate());
+	await Promise.all(languages.map((activating) => Promise.resolve(activating).catch(() => undefined)));
+	return new Set(await vscode.commands.getCommands(true));
+}
 
 export function activate(context: vscode.ExtensionContext): void {
 	// Welcome content requires a registered, empty tree provider.
@@ -79,9 +94,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('microbitIde.ui.openSerialTerminal', () => run(OPEN_TERMINAL)),
 		vscode.commands.registerCommand('microbitIde.ui.showAllActions', () => run(SHOW_MENU)),
 		vscode.commands.registerCommand('microbitIde.ui.createProject', () => createProject()),
-		vscode.commands.registerCommand('microbitIde.ui.showWelcome', () => showWelcome()),
-		vscode.commands.registerCommand(MICROPYTHON_MODE, () => switchMode('micropython')),
-		vscode.commands.registerCommand(CPP_MODE, () => switchMode('cpp'))
+		vscode.commands.registerCommand('microbitIde.ui.showWelcome', () => showWelcome(context.globalState)),
+		vscode.commands.registerCommand(MICROPYTHON_MODE, () => switchMode('micropython', context.globalState)),
+		vscode.commands.registerCommand(CPP_MODE, () => switchMode('cpp', context.globalState))
 	);
 
 	// Explorer forces contributed views closed; expand once to preserve later user choices.
@@ -92,7 +107,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	// Every session opens on it, in front of any tabs the session restored. With no
 	// serializer registered, VS Code never saves the tab, so a session never has two.
-	showWelcome();
+	showWelcome(context.globalState);
 
 	registerStatusBarMenu(context);
 
@@ -102,14 +117,29 @@ export function activate(context: vscode.ExtensionContext): void {
 	}, 300);
 }
 
-/** Both steps move the focus, so one runs after the other. */
+/** Every step moves the focus, so one runs after the other. */
 async function arrangeSidebar(context: vscode.ExtensionContext): Promise<void> {
-	await showStarterFolders();
+	const state = context.globalState;
+	const linked = await linkedMode(state);
+	// The linked mode replaces the starters this would show.
+	if (!linked) await showStarterFolders();
 	// Per workspace, since that is where VS Code keeps the sizes being settled.
 	if (!context.workspaceState.get<boolean>(SIZES_SETTLED) && (await settleSidebarSizes())) {
 		void context.workspaceState.update(SIZES_SETTLED, true);
 	}
+	if (!linked) return;
+	// Last, so its sidebar is the one left open. A link that did not finish is followed again next time.
+	if (!(await switchMode(linked, state))) return showStarterFolders();
+	await state.update(LINKED_KEY, linked);
 }
+
+/** The mode a `?mode=` link asks for, once: in kept storage a reload, or a mode picked since, is left alone. */
+async function linkedMode(state: vscode.Memento): Promise<Mode | undefined> {
+	const asked = toMode(await Promise.resolve(vscode.commands.executeCommand(LINKED_MODE_HOST)).catch(() => undefined));
+	return asked !== state.get<Mode>(LINKED_KEY) ? asked : undefined;
+}
+
+const appliedMode = (state: vscode.Memento) => state.get<Mode>(MODE_KEY);
 
 /**
  * A temporary session keeps nothing of the last one, so its Explorer starts with every folder
@@ -186,8 +216,10 @@ function managerApi(candidate: unknown): MicrobitManagerApi | undefined {
 
 let welcomePanel: vscode.WebviewPanel | undefined;
 
+const tellMode = (mode: Mode | undefined) => void welcomePanel?.webview.postMessage({ type: 'mode', mode });
+
 /** One panel per window: reopening reveals the existing one rather than stacking tabs. */
-function showWelcome(): void {
+function showWelcome(state: vscode.Memento): void {
 	if (welcomePanel) {
 		welcomePanel.reveal(vscode.ViewColumn.One);
 		return;
@@ -201,14 +233,18 @@ function showWelcome(): void {
 	const nonce = Array.from({ length: 32 }, () => Math.floor(Math.random() * 36).toString(36)).join('');
 	panel.webview.html = __WELCOME_HTML__.replace(/\{\{nonce\}\}/g, nonce);
 
-	// The page names the storage in use and offers the other. It asks again each time
-	// it reloads, which it does whenever the tab is shown after being hidden.
+	// The page names the storage and the mode in use and offers the others. It asks again
+	// each time it reloads, which it does whenever the tab is shown after being hidden.
 	const tellStorage = () => void panel.webview.postMessage({ type: 'storage', storage: storageApi()?.storage() });
 	const following = storageApi()?.onDidChangeStorage(tellStorage);
 
 	// The page cannot see a rejection, so this boundary is where one becomes a message.
 	panel.webview.onDidReceiveMessage((message: { type?: string; command?: string; theme?: string }) => {
-		if (message?.type === 'ready') return tellStorage();
+		if (message?.type === 'ready') {
+			tellStorage();
+			tellMode(appliedMode(state));
+			return;
+		}
 		let action: Thenable<unknown> | undefined;
 		if (message?.type === 'run' && message.command && WELCOME_COMMANDS.has(message.command)) {
 			action = run(message.command);
@@ -241,23 +277,29 @@ async function pin(changes: Record<string, boolean>): Promise<void> {
 }
 
 /** In turn with a storage switch or another mode, either of which would change the files under this one. */
-function switchMode(mode: Mode): Promise<void> {
-	const exclusive = storageApi()?.exclusive ?? ((task: () => Promise<void>) => task());
-	return exclusive(() => applyMode(mode));
+function switchMode(mode: Mode, state: vscode.Memento): Promise<boolean> {
+	const exclusive = storageApi()?.exclusive ?? ((task: () => Promise<boolean>) => task());
+	return exclusive(() => applyMode(mode, state));
 }
 
-/** Only the confirmation comes before any change, so declining it leaves the IDE as it was. */
-async function applyMode(mode: Mode): Promise<void> {
+/** True once the mode and its starter are in place. Only the confirmation comes before any change. */
+async function applyMode(mode: Mode, state: vscode.Memento): Promise<boolean> {
 	if (!(await registeredCommands()).has(LANGUAGES[mode].create)) {
 		fail(`the ${LANGUAGES[mode].label} extension is not available, so the mode was not changed.`);
-		return;
+		return false;
 	}
 	try {
 		const root = projectFolder()?.uri;
+		// Applied again, it would offer to replace the files. Adding a missing starter replaces nothing.
+		if (appliedMode(state) === mode) {
+			await vscode.commands.executeCommand(modeSidebar(mode));
+			if (root) await openStarter(mode, root);
+			return true;
+		}
 		const storage = storageApi();
 		// The temporary workspace, whose files a mode replaces. Kept storage is only ever added to.
 		const scratch = storage?.storage() === 'memfs' ? storage : undefined;
-		if (scratch && (await scratch.scratchChanged()) && !(await confirmReplace(mode))) return;
+		if (scratch && (await scratch.scratchChanged()) && !(await confirmReplace(mode))) return false;
 
 		const { kind } = vscode.window.activeColorTheme;
 		await setTheme(modeTheme(mode, kind === vscode.ColorThemeKind.Dark || kind === vscode.ColorThemeKind.HighContrast));
@@ -266,13 +308,18 @@ async function applyMode(mode: Mode): Promise<void> {
 		await pin({ [modeContainer(mode)]: true });
 		await vscode.commands.executeCommand(modeSidebar(mode));
 		await pin(modePins(mode));
+		// Saved with the theme and sidebar, which a failed starter below leaves in place.
+		await state.update(MODE_KEY, mode);
+		tellMode(mode);
 
-		if (!root) return;
+		if (!root) return true;
 		// The last step, and undone if the starter fails, so a failed switch costs no files.
 		const starter = () => openStarter(mode, root);
 		await (scratch ? scratch.replaceScratch(starter) : starter());
+		return true;
 	} catch (error) {
 		fail(`switching to ${LANGUAGES[mode].label} mode did not finish. ${errorText(error)}`);
+		return false;
 	}
 }
 
@@ -463,8 +510,7 @@ async function remember(language: Language): Promise<void> {
 }
 
 function settingLanguage(): Language | undefined {
-	const configured = vscode.workspace.getConfiguration('microbitIde', projectFolder()?.uri).get<string>('projectLanguage');
-	return configured === 'micropython' || configured === 'cpp' ? configured : undefined;
+	return toMode(vscode.workspace.getConfiguration('microbitIde', projectFolder()?.uri).get('projectLanguage'));
 }
 
 /**

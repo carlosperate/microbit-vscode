@@ -59,6 +59,8 @@
 				);
 			}
 			window.product = product;
+			// Read before the workbench loads, as nothing then promises to leave the address alone.
+			const linkedMode = new URLSearchParams(location.search).get('mode');
 
 			const HANDLE_DB = 'microbit-local-handle';
 			const HANDLE_STORE = 'handles';
@@ -254,6 +256,11 @@
 						// Takes `{ [containerId]: pinned }`, returns false when VS Code's storage was not found.
 						id: 'microbitIde._setPinnedHost',
 						handler: setPinned,
+					},
+					{
+						// `?mode=micropython` or `?mode=cpp`, which the `ui` extension checks and applies.
+						id: 'microbitIde._getLinkedModeHost',
+						handler: () => linkedMode,
 					},
 				];
 				api.create(document.body, opts);

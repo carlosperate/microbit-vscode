@@ -44,3 +44,9 @@ export const modeStarters = (mode: Mode, pythonFolder: string[]): string[][] =>
 
 // C++ builds from the Explorer, whose micro:bit panel flashes whichever language the files are.
 export const modeSidebar = (mode: Mode): string => (mode === 'micropython' ? CONTAINERS.micropython : 'workbench.view.explorer');
+
+/** The mode a link or a setting names, if it names one. Links get typed by hand, so case is ignored. */
+export function toMode(value: unknown): Mode | undefined {
+	const name = typeof value === 'string' ? value.toLowerCase() : undefined;
+	return name === 'micropython' || name === 'cpp' ? name : undefined;
+}
