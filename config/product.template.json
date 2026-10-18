@@ -19,6 +19,7 @@
 		"micropython-lsp.target": "microbit",
 		"workbench.startupEditor": "none",
 		"window.menuBarVisibility": "visible",
+		"editor.suggest.showStatusBar": true,
 		"editor.fontSize": 13
 	},
 	"additionalBuiltinExtensions": []
