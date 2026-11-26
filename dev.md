@@ -67,27 +67,38 @@ If `.cache/vscode-web/` is already present and the version in its
 So, a local VS Code source build (`npm run build:vscode`) can also create the
 bundle locally in `.cache/vscode-web/` for consumption by the build.
 
-To update the VS Code version used, update it from the `config/vscode-web.config.json`
-`vscodeVersion` field. You can build it locally via `npm run build:vscode`
-and once everything is tested and ready, it has to be published as a GH release
-in a tag named `vscode-web-vX.Y.Z`, so that future builds can fetch it.
+To update the VS Code version used:
+
+1. In `config/vscode-web.config.json` set `vscodeVersion` to the new
+   `microsoft/vscode` tag and `sha256` to `null`. Move `engines.vscode` in
+   `src/extensions/*/package.json` and `@types/vscode` in `package.json` to
+   the same version.
+2. `npm run build:vscode` builds it locally (see below).
+3. `npm test`. `test/vscode-bundle.test.mjs` checks what this repo takes from
+   the bundle by name: the files the page loads, VS Code's storage names and
+   the proposed APIs. Fix what a failing test names.
+4. `npm run build`. It fails (`patch verify`, `patch-webview-origin`) when one
+   of its two patches no longer fits the bundle.
+5. `npm run dev` and try it in Chrome, Firefox and Safari.
+6. Commit, tag that commit `vscode-web-vX.Y.Z` and push the tag only. The
+   tag's workflow builds VS Code and publishes it as a GH release. A push to
+   `main` deploys the site, which fails until that release exists.
+7. Delete `.cache/vscode-web`, run `npm run build` to fetch the release, and
+   try it again. Then set `sha256` from the release's `.sha256` file, commit
+   and push `main`.
 
 #### Building VS Code from source
 
 The normal path is to run `npm run build:vscode`.
 
 A docker image fetches the `microsoft/vscode` source code at the version pinned
-in `config/vscode-web.config.json`, and the final build goes into
-`.cache/vscode-web/`.
+in `config/vscode-web.config.json`, installs it with npm and runs upstream's own
+web build. The final build goes into `.cache/vscode-web/`.
 
 > [!WARNING]
-> **Give Docker ≥9 GB RAM.** `gulp vscode-web-min` runs Node with an 8 GB heap
-> and a memory-hungry mangler pass. On a smaller Docker VM the build GC-thrashes
-> and appears to hang at the `compile-src`/mangler step.
-
-Alternatively the `npm run build:old-vscode-web` script runs the older build
-pipeline fetching the pre-compiled VS Code v1.91.1 bundle included
-by the `vscode-web` npm package from `Felx-B/vscode-web`.
+> **Give Docker ≥9 GB RAM.** The compile runs Node with an 8 GB heap and peaked
+> at 7 GiB for VS Code 1.103.2. On a smaller Docker VM the build GC-thrashes
+> and appears to hang at the `compile-src` step.
 
 ## Testing over https
 
