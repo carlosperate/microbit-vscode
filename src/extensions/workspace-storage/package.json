@@ -9,7 +9,7 @@
 		"build": "node esbuild.config.mjs"
 	},
 	"engines": {
-		"vscode": "^1.91.0"
+		"vscode": "^1.103.0"
 	},
 	"browser": "./dist/extension.js",
 	"enabledApiProposals": ["fileSearchProvider", "textSearchProvider", "resolvers"],

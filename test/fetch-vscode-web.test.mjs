@@ -14,6 +14,7 @@ import {
 	fetchVscodeWeb,
 } from '../build-scripts/fetch-vscode-web.mjs';
 
+// Any version does: these tests bring their own config and zip, not the repo's pin.
 const VERSION = '1.91.1';
 const SLUG = 'carlosperate/microbit-vscode';
 
@@ -118,10 +119,11 @@ describe('fetchVscodeWeb', () => {
 
 	const zipPath = () => path.join(cacheDir, `vscode-web-v${VERSION}.zip`);
 	const sidecarPath = () => path.join(cacheDir, `vscode-web-v${VERSION}.zip.sha256`);
-	const bundlePkg = () => path.join(cacheDir, 'vscode-web', 'package.json');
+	const bundleDir = () => path.join(cacheDir, 'vscode-web');
+	const bundlePkg = () => path.join(bundleDir(), 'package.json');
 
 	async function seedBundle(version) {
-		await mkdir(path.join(cacheDir, 'vscode-web'), { recursive: true });
+		await mkdir(bundleDir(), { recursive: true });
 		await writeFile(bundlePkg(), JSON.stringify({ name: 'vscode-web', version }));
 	}
 
@@ -129,8 +131,31 @@ describe('fetchVscodeWeb', () => {
 		await seedBundle(VERSION);
 		const fetchImpl = mockFetch({});
 		const res = await fetchVscodeWeb({ config: { vscodeVersion: VERSION, repoSlug: SLUG }, cacheDir, fetchImpl, log });
-		expect(res.action).toBe('skip');
+		expect(res).toEqual({ version: VERSION, dir: bundleDir() });
 		expect(fetchImpl.calls).toEqual([]);
+	});
+
+	it('refuses an archive that holds another version, and fetches again once the release is fixed', async () => {
+		const mislabelled = await buildBundleZip('0.0.1');
+		await writeFile(zipPath(), mislabelled.buf);
+		await writeFile(sidecarPath(), sidecarText(mislabelled.sha, VERSION));
+		const config = { vscodeVersion: VERSION, repoSlug: SLUG, sha256: null };
+
+		await expect(
+			fetchVscodeWeb({ config, cacheDir, fetchImpl: mockFetch({}), log })
+		).rejects.toThrow(`holds VS Code 0.0.1, not the pinned ${VERSION}`);
+
+		// Nothing of it may stay cached, or the next build would unpack it again.
+		expect(existsSync(bundlePkg())).toBe(false);
+		expect(existsSync(zipPath())).toBe(false);
+		expect(existsSync(sidecarPath())).toBe(false);
+
+		const fixed = await buildBundleZip(VERSION);
+		const { zipUrl, sha256Url } = releaseUrls(VERSION, SLUG);
+		const republished = mockFetch({ [zipUrl]: fixed.buf, [sha256Url]: sidecarText(fixed.sha, VERSION) });
+		await fetchVscodeWeb({ config, cacheDir, fetchImpl: republished, log });
+		expect(republished.calls).toContain(zipUrl);
+		expect(JSON.parse(await readFile(bundlePkg(), 'utf8')).version).toBe(VERSION);
 	});
 
 	it('tracking-mode cache hit: verifies via sidecar, unzips, no network', async () => {
@@ -162,8 +187,9 @@ describe('fetchVscodeWeb', () => {
 		await writeFile(zipPath(), buf);
 		const fetchImpl = mockFetch({});
 
-		await fetchVscodeWeb({ config: { vscodeVersion: VERSION, repoSlug: SLUG, sha256: sha }, cacheDir, fetchImpl, log });
+		const res = await fetchVscodeWeb({ config: { vscodeVersion: VERSION, repoSlug: SLUG, sha256: sha }, cacheDir, fetchImpl, log });
 
+		expect(res).toEqual({ version: VERSION, dir: bundleDir() });
 		expect(fetchImpl.calls).toEqual([]);
 		expect(existsSync(sidecarPath())).toBe(false);
 		expect(JSON.parse(await readFile(bundlePkg(), 'utf8')).version).toBe(VERSION);

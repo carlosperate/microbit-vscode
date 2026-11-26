@@ -68,7 +68,7 @@ describe('checkExtensionUpdates', () => {
 	});
 
 	it('reports an error row when the registry lookup fails', async () => {
-		// 404 (< 500, not 429) makes resolveVersion give up immediately — no retry delays.
+		// 404 (< 500, not 429) makes resolveVersion give up immediately, no retry delays.
 		globalThis.fetch = async () => ({ ok: false, status: 404 });
 	
 		const [row] = await checkExtensionUpdates([{ publisher: 'p', name: 'missing', version: '1.0.0' }]);

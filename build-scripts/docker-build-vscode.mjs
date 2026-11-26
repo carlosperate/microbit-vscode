@@ -3,8 +3,8 @@
  *
  * Builds the build image from build-scripts/vscode/Dockerfile, then runs it
  * with the repo mounted at /work. The in-container entrypoint
- * (build-scripts/vscode/build-vscode.mjs) does the actual clone + patch +
- * gulp vscode-web-min, saving the final build to .cache/vscode-web/.
+ * (build-scripts/vscode/build-vscode.mjs) does the actual clone, install and
+ * upstream web build, saving the final build to .cache/vscode-web/.
  *
  * Docker resources: the VSCode build runs Node with an 8 GB heap and is
  * memory-hungry. Give Docker ≥9 GB RAM, or GC-thrashes and appears to hang.
@@ -20,7 +20,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const TAG = 'microbit-vscode-build';
 const RECOMMENDED_MEM_GIB = 9;
 
-/** Warn early if the Docker VM has too little RAM for the gulp mangler/minify. */
+/** Warn early if the Docker VM has too little RAM for the compile's 8 GB heap. */
 function warnIfLowMemory() {
   const info = spawnSync('docker', ['info', '--format', '{{.MemTotal}}'], { encoding: 'utf8' });
   const memBytes = Number(info.stdout?.trim());
@@ -30,7 +30,7 @@ function warnIfLowMemory() {
     console.warn(
       `\n⚠  Docker has configured only ${memGiB.toFixed(1)} GiB RAM. The VS Code build requests an 8 GB\n` +
       `   Node heap and needs ≥${RECOMMENDED_MEM_GIB} GiB to avoid GC thrashing (it tends to stall at the\n` +
-      `   "compile-src"/mangler step otherwise).\n`
+      `   "compile-src" step otherwise).\n`
     );
   }
 }

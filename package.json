@@ -6,7 +6,6 @@
   "type": "module",
   "scripts": {
     "build": "node build-scripts/build.mjs",
-    "build:old-vscode-web": "node build-scripts/build.mjs --vscode-web-npm",
     "build:vscode": "node build-scripts/docker-build-vscode.mjs",
     "fetch:vscode": "node build-scripts/fetch-vscode-web.mjs",
     "build:local-extensions": "node build-scripts/build-local-extensions.mjs",
@@ -19,12 +18,9 @@
     "test:watch": "vitest",
     "clean": "rimraf .cache dist"
   },
-  "dependencies": {
-    "vscode-web": "^1.91.1"
-  },
   "devDependencies": {
     "@types/node": "^20.11.0",
-    "@types/vscode": "^1.91.0",
+    "@types/vscode": "1.103.0",
     "esbuild": "^0.21.0",
     "fake-indexeddb": "^6.2.5",
     "rimraf": "^5.0.5",

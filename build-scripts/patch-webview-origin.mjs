@@ -4,8 +4,8 @@ import { createHash } from 'node:crypto';
  * Patch the webview bootstrap's parent-origin check to accept same-origin webviews,
  * and re-sync the Content-Security-Policy hash that pins its inline script.
  *
- * Upstream (`out/vs/workbench/contrib/webview/browser/pre/index.html`, and the
- * `index-no-csp.html` sibling) only trusts a webview whose *hostname* equals a
+ * Upstream (`out/vs/workbench/contrib/webview/browser/pre/index.html`) only
+ * trusts a webview whose *hostname* equals a
  * per-webview sha-256 hash, a scheme that requires serving each webview from a
  * unique wildcard subdomain (`https://<hash>.vscode-cdn.net/…`). We self-host the
  * webview assets from our own single origin (GitHub Pages / localhost), so that
@@ -24,7 +24,7 @@ import { createHash } from 'node:crypto';
  * the browser block the (now-modified) script under CSP, which is a *blank*
  * webview with a console CSP violation rather than the origin error. So after
  * editing the guard we recompute the inline-script hash and rewrite the CSP.
- * `index-no-csp.html` has no such meta, so that step is a no-op there.
+ * A page with no such meta is left without one.
  *
  * Anchored on the exact guard line; throws if upstream changed it, so the build
  * fails loudly and signals a rebase rather than silently shipping broken webviews.
@@ -34,9 +34,8 @@ const PATCHED = `if (parentOrigin === location.origin || hostname === parentOrig
 
 // The CSP-pinned bootstrap is the inline script carrying the origin-guard logic
 // (it references `parentOriginHash`). We select it by that symbol rather than
-// "the first <script>" so unrelated leading scripts are skipped, notably the
-// empty `<script></script>` Firefox workaround that already precedes it in
-// index-no-csp.html and could appear in index.html on a future upstream bump.
+// "the first <script>" so unrelated leading scripts are skipped, such as the
+// empty `<script></script>` Firefox workaround upstream has put before it.
 const GUARD_SYMBOL = 'parentOriginHash';
 const INLINE_SCRIPT_RE = /<script\b[^>]*>([\s\S]*?)<\/script>/g;
 // CSP sources inside an HTML `content="…"` meta are single-quoted (the attribute
@@ -103,12 +102,11 @@ function syncInlineScriptCsp(html) {
 	const hash = computeInlineScriptCspHash(html);
 	if (hash === null) return html; // no guard script to pin
 	const hashes = declaredScriptHashes(html);
-	if (hashes.length === 0) return html; // no CSP hash source (e.g. index-no-csp.html)
+	if (hashes.length === 0) return html; // no CSP hash source
 	if (hashes.length > 1) {
 		throw new Error(
 			'patch-webview-origin: CSP script-src declares multiple sha256 sources, so the ' +
-			'single-inline-script assumption no longer holds; update patch-webview-origin.mjs ' +
-			'(see WORKBENCH_PATCH.md).'
+			'single-inline-script assumption no longer holds; update patch-webview-origin.mjs.'
 		);
 	}
 	return html.replace(hashes[0][0], () => `'${hash}'`);
@@ -120,7 +118,7 @@ export function patchWebviewOriginCheck(html) {
 		out = out.replaceAll(GUARD, PATCHED); // patch every occurrence, not just the first
 	} else if (!out.includes(PATCHED)) {
 		throw new Error(
-			'patch-webview-origin: guard anchor not found in webview pre/*.html. ' +
+			'patch-webview-origin: guard anchor not found in webview pre/index.html. ' +
 			'Upstream VS Code changed the parent-origin check; rebase this patch.'
 		);
 	}

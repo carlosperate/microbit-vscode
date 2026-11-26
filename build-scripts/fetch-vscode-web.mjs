@@ -13,7 +13,7 @@
  *              the committed hash.
  *            - config.sha256 null -> download zip + .sha256 sidecar,
  *              verify the zip against the sidecar hash.
- *      then unzip into <cache>/.
+ *      then unzip into <cache>/, and refuse a bundle that is not vscodeVersion.
  *
  * Verification runs on every download AND every cache hit. Cache files live at
  * <cache>/vscode-web-v<version>.zip (+ .sha256 in tracking mode), keyed by
@@ -33,8 +33,14 @@ import yauzl from 'yauzl';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 /** Read and parse config/vscode-web.config.json. */
-function loadConfig() {
+export function loadConfig() {
 	return JSON.parse(readFileSync(path.join(root, 'config', 'vscode-web.config.json'), 'utf8'));
+}
+
+/** The version a bundle folder's own package.json states, or null without one. */
+export function bundleVersion(bundleDir) {
+	const pkg = path.join(bundleDir, 'package.json');
+	return existsSync(pkg) ? JSON.parse(readFileSync(pkg, 'utf8')).version : null;
 }
 
 /** Derive the release asset URLs for a version + repo slug. */
@@ -176,7 +182,8 @@ async function extractEntry(zip, entry, destDir) {
  * the release zip when needed. Throws (does not exit) on any error so it's
  * testable; the CLI wrapper maps that onto a non-zero exit.
  *
- * @returns {Promise<{ action: 'skip' | 'downloaded', version: string }>}
+ * @returns {Promise<{ version: string, dir: string }>}
+ *     `dir` holds a bundle whose own package.json says `version`.
  */
 export async function fetchVscodeWeb({
 	config = loadConfig(),
@@ -191,20 +198,18 @@ export async function fetchVscodeWeb({
 	const mode = lockedSha ? 'locked' : 'tracking';
 
 	const bundleDir = path.join(cacheDir, 'vscode-web');
-	const bundlePkg = path.join(bundleDir, 'package.json');
 	const { zipName, zipUrl, sha256Url } = releaseUrls(version, repoSlug);
 	const zipPath = path.join(cacheDir, zipName);
 	const sidecarPath = path.join(cacheDir, `${zipName}.sha256`);
+	const dropZip = () => Promise.all([zipPath, sidecarPath].map((file) => rm(file, { force: true })));
 
 	// 1. Already at the right version → nothing to do.
-	if (existsSync(bundlePkg)) {
-		const current = JSON.parse(await readFile(bundlePkg, 'utf8')).version;
-		if (current === version) {
-			log(`vscode-web ${version} already present in ${path.relative(root, bundleDir)}, skipping.`);
-			return { action: 'skip', version };
-		}
-		log(`Cached vscode-web is ${current}, want ${version}. Refetching.`);
+	const current = bundleVersion(bundleDir);
+	if (current === version) {
+		log(`vscode-web ${version} already present in ${path.relative(root, bundleDir)}, skipping.`);
+		return { version, dir: bundleDir };
 	}
+	if (current !== null) log(`Cached vscode-web is ${current}, want ${version}. Refetching.`);
 
 	// 2. Clear any stale bundle, then obtain + verify the zip.
 	await rm(bundleDir, { recursive: true, force: true });
@@ -217,7 +222,7 @@ export async function fetchVscodeWeb({
 			log(`Downloading ${zipUrl}`);
 			await downloadFile(zipUrl, zipPath, fetchImpl, { version, repoSlug });
 		}
-		await verifyChecksum(zipPath, lockedSha, 'locked', version, () => rm(zipPath, { force: true }));
+		await verifyChecksum(zipPath, lockedSha, 'locked', version, dropZip);
 		log(`Verified ${zipName} against config/vscode-web.config.json sha256 (locked) ✓`);
 	} else {
 		if (existsSync(zipPath) && existsSync(sidecarPath)) {
@@ -229,22 +234,29 @@ export async function fetchVscodeWeb({
 			await downloadFile(sha256Url, sidecarPath, fetchImpl, { version, repoSlug });
 		}
 		const expectedSha = parseSidecar(await readFile(sidecarPath, 'utf8'));
-		await verifyChecksum(zipPath, expectedSha, 'tracking', version, async () => {
-			await rm(zipPath, { force: true });
-			await rm(sidecarPath, { force: true });
-		});
+		await verifyChecksum(zipPath, expectedSha, 'tracking', version, dropZip);
 		log(`Verified ${zipName} against ${zipName}.sha256 release sidecar (tracking) ✓`);
 	}
 
 	log(`Unpacking ${zipName} → ${path.relative(root, bundleDir)}`);
 	await unzip(await readFile(zipPath), cacheDir);
 
-	if (!existsSync(bundlePkg)) {
+	// The asset's name and checksum say nothing about what was built into it.
+	const unpacked = bundleVersion(bundleDir);
+	if (unpacked === null) {
 		throw new Error(
-			`unzip did not produce ${path.relative(root, bundlePkg)}, unexpected archive layout`
+			`unzip did not produce ${path.relative(root, bundleDir)}/package.json, unexpected archive layout`
 		);
 	}
-	return { action: 'downloaded', version };
+	if (unpacked !== version) {
+		// The zip goes too: kept, it would be unpacked again after the release is fixed.
+		await Promise.all([rm(bundleDir, { recursive: true, force: true }), dropZip()]);
+		throw new Error(
+			`${zipName} holds VS Code ${unpacked}, not the pinned ${version}. ` +
+			'The release asset is mislabelled: build and publish it again.'
+		);
+	}
+	return { version, dir: bundleDir };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {

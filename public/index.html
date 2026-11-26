@@ -15,7 +15,10 @@
 		<!-- Workbench Icon/Manifest/CSS -->
 		<link rel="icon" href="./favicon.ico" type="image/x-icon" />
 		<link rel="manifest" href="./manifest.json">
-		<link data-name="vs/workbench/workbench.web.main" rel="stylesheet" href="./vscode/out/vs/workbench/workbench.web.main.css">
+		<link rel="stylesheet" href="./vscode/out/vs/workbench/workbench.web.main.internal.css">
+		<!-- Fetched while the script below prepares the session. They run only when it imports them. -->
+		<link rel="modulepreload" href="./vscode/out/nls.messages.js">
+		<link rel="modulepreload" href="./vscode/out/vs/workbench/workbench.web.main.internal.js">
 	</head>
 
 	<body aria-label=""></body>
@@ -23,25 +26,11 @@
 	<!-- Startup (do not modify order of script tags!) -->
 	<script src="./rebase.js"></script>
 	<script src="./session.js"></script>
-	<script src="./vscode/out/vs/loader.js"></script>
-	<script src="./vscode/out/vs/webPackagePaths.js"></script>
 	<script>
 		const BASE = new URL('.', document.baseURI).href.replace(/\/$/, '');
-		Object.keys(self.webPackagePaths).map(function (key) {
-			self.webPackagePaths[key] = `${BASE}/vscode/node_modules/${key}/${self.webPackagePaths[key]}`;
-		});
-		require.config({
-			baseUrl: `${BASE}/vscode/out`,
-			recordStats: true,
-			trustedTypesPolicy: window.trustedTypes?.createPolicy('amdLoader', {
-				createScriptURL(value) { return value; }
-			}),
-			paths: self.webPackagePaths
-		});
-	</script>
-	<script src="./vscode/out/vs/workbench/workbench.web.main.nls.js"></script>
-	<script src="./vscode/out/vs/workbench/workbench.web.main.js"></script>
-	<script>
+		// VS Code resolves its workers, media and node_modules from this, so it must be absolute.
+		globalThis._VSCODE_FILE_ROOT = `${BASE}/vscode/out/`;
+
 		// Boot the workbench inline (replacing the upstream
 		// `vs/code/browser/workbench/workbench.js` embedder) so we can pass
 		// `IWorkbenchConstructionOptions.commands`, host-side commands that run
@@ -58,7 +47,6 @@
 					(ext) => window.microbitRebase(ext, location.host, proto, basePath)
 				);
 			}
-			window.product = product;
 			// Read before the workbench loads, as nothing then promises to leave the address alone.
 			const linkedMode = new URLSearchParams(location.search).get('mode');
 
@@ -158,7 +146,7 @@
 
 			// VS Code has no API to pin an activity bar container. It keeps the pinned list in this
 			// database and syncs other windows over a BroadcastChannel of the same name, so a write
-			// announced there reaches this window too. `build.mjs` checks both names still exist.
+			// announced there reaches this window too. `test/vscode-bundle.test.mjs` checks the names still exist.
 			const STATE_DB = 'vscode-web-state-db-global';
 			const PINNED_KEY = 'workbench.activity.pinnedViewlets2';
 			// A channel never hears its own posts, so everything this one hears is VS Code.
@@ -203,68 +191,88 @@
 				});
 			}
 
-			require(['vs/workbench/workbench.web.main', 'vs/base/common/uri'], (api, uriMod) => {
-				const opts = { ...product };
-				opts.additionalBuiltinExtensions = product.additionalBuiltinExtensions.map((a) => uriMod.URI.revive(a));
-				if (product.folderUri) {
-					opts.workspaceProvider = {
-						// Always the same folder: switching storage swaps what the `workspace-storage`
-						// extension serves behind it, so nothing ever opens another folder.
-						workspace: { folderUri: uriMod.URI.revive(product.folderUri) },
-						open: async () => true,
-						trusted: true,
-					};
-				}
-				// Serve webview content (markdown preview, custom editors, …) from
-				// the `pre/` folder shipped in our own bundle. Without this, VS Code
-				// falls back to `https://{{uuid}}.vscode-cdn.net/{{quality}}/{{commit}}/…`;
-				// our product.json carries no `commit`, so it substitutes a stale
-				// hardcoded Insiders hash that Microsoft's CDN no longer serves (504).
-				opts.webviewEndpoint = `${BASE}/vscode/out/vs/workbench/contrib/webview/browser/pre`;
+			// Safari reuses a failed preload on every reload, so a failed import is tried once more at a new address.
+			const importWithRetry = (url) => import(url).catch(() => import(`${url}?retry=${Date.now()}`));
+			// The workbench reads its strings as it loads, so they come first.
+			await importWithRetry(`${BASE}/vscode/out/nls.messages.js`);
+			const { create, URI } = await importWithRetry(`${BASE}/vscode/out/vs/workbench/workbench.web.main.internal.js`);
 
-				opts.commands = [
-					{
-						// Host-side bridge for `showDirectoryPicker` (window-only API,
-						// not reachable from the extension host worker). Picks a folder,
-						// persists the `FileSystemDirectoryHandle` to IndexedDB so the
-						// worker can pick it up via `loadStoredHandle`, returns boolean.
-						id: 'microbitIde._pickLocalFolderHost',
-						handler: async () => {
-							if (typeof window.showDirectoryPicker !== 'function') return false;
-							let handle;
-							try {
-								handle = await window.showDirectoryPicker({ mode: 'readwrite' });
-							} catch (e) {
-								return false; // user cancelled or denied
-							}
-							try {
-								await putIdb(HANDLE_DB, HANDLE_STORE, HANDLE_KEY, handle);
-							} catch (e) {
-								console.error('Failed to persist local folder handle', e);
-								return false;
-							}
-							return true;
-						},
+			const opts = { ...product };
+			opts.additionalBuiltinExtensions = product.additionalBuiltinExtensions.map((a) => URI.revive(a));
+			if (product.folderUri) {
+				opts.workspaceProvider = {
+					// Always the same folder: switching storage swaps what the `workspace-storage`
+					// extension serves behind it, so nothing ever opens another folder.
+					workspace: { folderUri: URI.revive(product.folderUri) },
+					open: async () => true,
+					trusted: true,
+				};
+			}
+			// Serve webview content (markdown preview, custom editors, …) from
+			// the `pre/` folder shipped in our own bundle. Without this, VS Code
+			// falls back to `https://{{uuid}}.vscode-cdn.net/{{quality}}/{{commit}}/…`;
+			// our product.json carries no `commit`, so it substitutes a stale
+			// hardcoded Insiders hash that Microsoft's CDN no longer serves (504).
+			opts.webviewEndpoint = `${BASE}/vscode/out/vs/workbench/contrib/webview/browser/pre`;
+
+			opts.commands = [
+				{
+					// Host-side bridge for `showDirectoryPicker` (window-only API,
+					// not reachable from the extension host worker). Picks a folder,
+					// persists the `FileSystemDirectoryHandle` to IndexedDB so the
+					// worker can pick it up via `loadStoredHandle`, returns boolean.
+					id: 'microbitIde._pickLocalFolderHost',
+					handler: async () => {
+						if (typeof window.showDirectoryPicker !== 'function') return false;
+						let handle;
+						try {
+							handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+						} catch (e) {
+							return false; // user cancelled or denied
+						}
+						try {
+							await putIdb(HANDLE_DB, HANDLE_STORE, HANDLE_KEY, handle);
+						} catch (e) {
+							console.error('Failed to persist local folder handle', e);
+							return false;
+						}
+						return true;
 					},
-					{
-						// Asked before offering a local folder. The feature, not the browser's name,
-						// is what counts: Chromium on Android has the name and not the picker.
-						id: 'microbitIde._canPickLocalFolderHost',
-						handler: () => typeof window.showDirectoryPicker === 'function',
-					},
-					{
-						// Takes `{ [containerId]: pinned }`, returns false when VS Code's storage was not found.
-						id: 'microbitIde._setPinnedHost',
-						handler: setPinned,
-					},
-					{
-						// `?mode=micropython` or `?mode=cpp`, which the `ui` extension checks and applies.
-						id: 'microbitIde._getLinkedModeHost',
-						handler: () => linkedMode,
-					},
-				];
-				api.create(document.body, opts);
-			});
-		})();
+				},
+				{
+					// Asked before offering a local folder. The feature, not the browser's name,
+					// is what counts: Chromium on Android has the name and not the picker.
+					id: 'microbitIde._canPickLocalFolderHost',
+					handler: () => typeof window.showDirectoryPicker === 'function',
+				},
+				{
+					// Takes `{ [containerId]: pinned }`, returns false when VS Code's storage was not found.
+					id: 'microbitIde._setPinnedHost',
+					handler: setPinned,
+				},
+				{
+					// `?mode=micropython` or `?mode=cpp`, which the `ui` extension checks and applies.
+					id: 'microbitIde._getLinkedModeHost',
+					handler: () => linkedMode,
+				},
+			];
+			create(document.body, opts);
+		})().catch(startupFailed);
+
+		// Without this a failed start is a blank page, with the reason only in the console.
+		function startupFailed(error) {
+			console.error('micro:bit IDE: could not start', error);
+			const message = document.createElement('p');
+			message.textContent = 'The micro:bit Web IDE could not start. Reload the page to try again.';
+			const reload = document.createElement('button');
+			reload.textContent = 'Reload';
+			reload.style.cssText = 'font: inherit; padding: 0.4em 1.2em;';
+			reload.addEventListener('click', () => location.reload());
+			const box = document.createElement('div');
+			box.setAttribute('role', 'alert');
+			box.style.cssText = 'font: 16px system-ui, sans-serif; max-width: 28em; margin: 20vh auto; padding: 0 1em; text-align: center;';
+			box.append(message, reload);
+			document.body.replaceChildren(box);
+		}
 	</script>
 </html>

@@ -9,7 +9,7 @@ const distExtensionsDir = path.join(root, 'dist', 'extensions');
 
 // Local extensions authored and built in this repository. Each owns an
 // `esbuild.config.mjs` that exports `getBuildOptions()` or can build itself.
-const localExtensions = [
+export const localExtensions = [
 	path.join(srcExtensionsDir, 'workspace-storage'),
 	path.join(srcExtensionsDir, 'ui'),
 ];

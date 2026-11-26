@@ -22,35 +22,6 @@ const publicDir = path.join(root, 'public');
 const productTemplate = path.join(root, 'config', 'product.template.json');
 const layoutConfig = path.join(root, 'config', 'layout.config.json');
 
-/**
- * Pick the vscode-web bundle to build against.
- *
- * Default: the local source build at .cache/vscode-web.
- * `--vscode-web-npm` opts into the legacy `vscode-web` npm package.
- */
-function resolveVscodeWebSource(useNpm) {
-	const dir = useNpm
-		? path.join(root, 'node_modules', 'vscode-web', 'dist')
-		: path.join(root, '.cache', 'vscode-web');
-	const pkgPath = useNpm
-		? path.join(root, 'node_modules', 'vscode-web', 'package.json')
-		: path.join(dir, 'package.json');
-	const label = useNpm
-		? 'node_modules/vscode-web (npm package)'
-		: '.cache/vscode-web (local source build)';
-
-	if (!existsSync(dir)) {
-		console.error(
-			`vscode-web source not found: ${path.relative(root, dir)}/\n` +
-			(useNpm
-				? 'Run `npm install` to restore the vscode-web npm package.'
-				: 'Build it with `npm run build:vscode`.')
-		);
-		process.exit(1);
-	}
-	return { dir, pkgPath, label };
-}
-
 /** Wipe and recreate dist/. */
 async function resetDist() {
 	await rm(dist, { recursive: true, force: true });
@@ -74,31 +45,15 @@ async function* walkFiles(dir) {
 	}
 }
 
-// The webview bootstrap files we patch. `index.html` is mandatory. If it's
-// gone our webviews are broken, so its absence is a hard build failure. The
-// `-no-csp` sibling is best-effort (patched if present).
-const WEBVIEW_PRE_FILES = ['index.html', 'index-no-csp.html'];
 // A looser match than the strip pattern (tolerates spacing/quote drift, and
 // matches absolute or protocol-relative URLs) used to double-check nothing
 // slipped through. An independent backstop, not a copy.
 const EXTERNAL_SOURCEMAP_RE = /sourceMappingURL\s*=\s*['"]?(?:https?:)?\/\//;
 
 /**
- * Sever the copied vscode-web bundle's two dependencies on Microsoft's CDN:
- *
- * 1. `//# sourceMappingURL=https://main.vscode-cdn.net/…` trailers on ~47 JS
- *    files whose `.map` we never ship. Dead 504 requests with DevTools open.
- * 2. The webview bootstrap's parent-origin check (`pre/index.html`,
- *    `pre/index-no-csp.html`) that only trusts wildcard `*.vscode-cdn.net`
- *    hostnames. Patched to also trust same-origin webviews, since we self-host
- *    the `pre/` assets (see webviewEndpoint in public/index.html).
- *
- * Each patch is followed immediately by an assertion that its intended invariant
- * actually holds in the output, so a patch that silently does nothing (stale
- * anchor, moved folder, drifted format) fails the build loudly rather than
- * shipping broken webviews. This mirrors the workbench.ts patch's discipline.
- * When bumping vscodeVersion and a throw fires, see WORKBENCH_PATCH.md →
- * "Maintaining the bundle patches".
+ * Cut the copied bundle's two ties to Microsoft's CDN: sourcemap links to maps we
+ * never ship, and a webview guard that only trusts `*.vscode-cdn.net`. Each patch
+ * asserts its own result, so one that silently did nothing fails the build.
  */
 async function patchVscodeBundle() {
 	console.log('Patching vscode-web bundle (sourcemap URLs + webview origin check)');
@@ -121,64 +76,37 @@ async function patchVscodeBundle() {
 		throw new Error(
 			`patch verify: ${leaks.length} file(s) still carry an absolute sourceMappingURL after stripping ` +
 			`(e.g. ${leaks[0]}). The strip pattern is stale for this vscodeVersion, update ` +
-			'build-scripts/strip-sourcemap-urls.mjs (see WORKBENCH_PATCH.md).'
+			'build-scripts/strip-sourcemap-urls.mjs.'
 		);
 	}
 	console.log(`  stripped external sourceMappingURL from ${stripped} file(s)`);
 
 	// (2) Widen the webview parent-origin guard (+ re-sync its CSP hash).
-	const preDir = path.join(vscodeDir, 'out', 'vs', 'workbench', 'contrib', 'webview', 'browser', 'pre');
-	const [required] = WEBVIEW_PRE_FILES;
-	if (!existsSync(path.join(preDir, required))) {
+	const preIndex = path.join(vscodeDir, 'out', 'vs', 'workbench', 'contrib', 'webview', 'browser', 'pre', 'index.html');
+	if (!existsSync(preIndex)) {
 		throw new Error(
-			`patch-webview-origin: ${required} not found under ${path.relative(root, preDir)}. ` +
-			'Upstream VS Code moved the webview bootstrap folder; rebase this patch (see WORKBENCH_PATCH.md).'
+			`patch-webview-origin: ${path.relative(root, preIndex)} not found. ` +
+			'Upstream VS Code moved the webview bootstrap folder; update preIndex in patchVscodeBundle().'
 		);
 	}
-	let patched = 0;
-	for (const name of WEBVIEW_PRE_FILES) {
-		const file = path.join(preDir, name);
-		if (!existsSync(file)) continue;
-		const before = await readFile(file, 'utf8');
-		const after = patchWebviewOriginCheck(before); // throws if the guard anchor is gone
-		if (after !== before) {
-			await writeFile(file, after);
-			patched++;
-		}
-	}
-	assertWebviewPatched(await readFile(path.join(preDir, required), 'utf8'), required);
-	console.log(`  patched webview origin check in ${patched} file(s); CSP hash in sync`);
-
-	// (3) Not a patch: public/index.html pins activity bar containers through these internals.
-	const workbench = await readFile(path.join(vscodeDir, 'out', 'vs', 'workbench', 'workbench.web.main.js'), 'utf8');
-	const anchors = {
-		'state database name': '"vscode-web-state-db-"',
-		'application storage id': 'id:"global",broadcastChanges:!0',
-		'pinned containers key': '"workbench.activity.pinnedViewlets2"',
-	};
-	for (const [what, anchor] of Object.entries(anchors)) {
-		if (!workbench.includes(anchor)) {
-			throw new Error(`storage check: the workbench no longer has its ${what} (${anchor}); update setPinned in public/index.html.`);
-		}
-	}
-	if (!/\{changed:[\w$.]+,deleted:[\w$.]+\}/.test(workbench)) {
-		throw new Error('storage check: the workbench changed its storage sync message; update setPinned in public/index.html.');
-	}
+	const patchedIndex = patchWebviewOriginCheck(await readFile(preIndex, 'utf8')); // throws if the guard anchor is gone
+	await writeFile(preIndex, patchedIndex);
+	assertWebviewPatched(patchedIndex);
+	console.log('  patched the webview origin check; CSP hash in sync');
 }
 
 /** Assert the patched webview bootstrap carries our bypass and a matching CSP hash. */
-function assertWebviewPatched(html, name) {
+function assertWebviewPatched(html) {
 	if (!html.includes('parentOrigin === location.origin')) {
 		throw new Error(
-			`patch verify: ${name} is missing the same-origin webview bypass after patching. ` +
-			'The parent-origin guard changed shape upstream; rebase build-scripts/patch-webview-origin.mjs ' +
-			'(see WORKBENCH_PATCH.md).'
+			'patch verify: pre/index.html is missing the same-origin webview bypass after patching. ' +
+			'The parent-origin guard changed shape upstream; rebase build-scripts/patch-webview-origin.mjs.'
 		);
 	}
 	if (hasUnpatchedGuard(html)) {
 		throw new Error(
-			`patch verify: ${name} still contains an un-patched origin guard after patching (a duplicate guard ` +
-			'upstream?). Rebase build-scripts/patch-webview-origin.mjs (see WORKBENCH_PATCH.md).'
+			'patch verify: pre/index.html still contains an un-patched origin guard after patching (a duplicate guard ' +
+			'upstream?). Rebase build-scripts/patch-webview-origin.mjs.'
 		);
 	}
 	// If this doc pins an inline script via CSP, that hash MUST be readable and
@@ -192,9 +120,8 @@ function assertWebviewPatched(html, name) {
 		const expected = computeInlineScriptCspHash(html);
 		if (declared === null || expected === null || declared !== expected) {
 			throw new Error(
-				`patch verify: ${name} CSP script-src hash (${declared}) does not match its inline script ` +
-				`(${expected}). The CSP re-sync in patch-webview-origin.mjs failed for this vscodeVersion ` +
-				'(see WORKBENCH_PATCH.md).'
+				`patch verify: pre/index.html CSP script-src hash (${declared}) does not match its inline script ` +
+				`(${expected}). The CSP re-sync in patch-webview-origin.mjs failed for this vscodeVersion.`
 			);
 		}
 	}
@@ -222,17 +149,9 @@ async function writeProductJson(vscodeWebVersion, extensionRefs, enabledApiPropo
 	await writeFile(path.join(dist, 'product.json'), JSON.stringify(product, null, '\t') + '\n');
 }
 
-async function main(argv = process.argv.slice(2)) {
-	const useNpmVscodeWeb = argv.includes('--vscode-web-npm');
-	// Default path: make sure .cache/vscode-web exists and matches the pinned
-	// version before we try to consume it. Skipped for the npm build route
-	// (--vscode-web-npm), which has its own source under node_modules/.
-	if (!useNpmVscodeWeb) {
-		await fetchVscodeWeb();
-	}
-	const vscodeWeb = resolveVscodeWebSource(useNpmVscodeWeb);
-	const vscodeWebPkg = JSON.parse(await readFile(vscodeWeb.pkgPath, 'utf8'));
-	console.log(`vscode-web source: ${vscodeWeb.label} @ ${vscodeWebPkg.version}`);
+async function main() {
+	// Throws unless .cache/vscode-web ends up holding the pinned version.
+	const vscodeWeb = await fetchVscodeWeb();
 
 	await resetDist();
 	await copyStaticAssets(vscodeWeb.dir);
@@ -244,7 +163,7 @@ async function main(argv = process.argv.slice(2)) {
 	console.log('Fetching Open VSX extensions:');
 	const openvsxExtensionRefs = await fetchAndUnpackExtensions();
 
-	await writeProductJson(vscodeWebPkg.version, [...local.refs, ...openvsxExtensionRefs], local.proposals);
+	await writeProductJson(vscodeWeb.version, [...local.refs, ...openvsxExtensionRefs], local.proposals);
 
 	console.log('Build complete 🚀');
 }

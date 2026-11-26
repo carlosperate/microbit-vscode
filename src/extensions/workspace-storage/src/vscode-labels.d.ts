@@ -1,6 +1,6 @@
 /**
  * The label formatter from the proposed `resolvers` API, which `@types/vscode`
- * does not carry. Only what `extension.ts` uses, as VS Code 1.91 serves it;
+ * does not carry. Only what `extension.ts` uses, as the pinned VS Code serves it;
  * `enabledApiProposals` in the manifest is what lets this extension call it.
  */
 declare module 'vscode' {

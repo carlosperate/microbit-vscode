@@ -1,6 +1,6 @@
 /**
  * The search provider API, which is proposed rather than stable, so `@types/vscode`
- * does not carry it. Only what `search.ts` uses, matching the shape VS Code 1.91
+ * does not carry it. Only what `search.ts` uses, in the shape the pinned VS Code
  * serves; `enabledApiProposals` in the manifest is what lets this extension call it.
  */
 declare module 'vscode' {

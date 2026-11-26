@@ -2,10 +2,9 @@
  * VS Code web source build.
  *
  * Reads the pinned version from config/vscode-web.config.json, shallow-clones
- * microsoft/vscode at that tag, applies the vendored bootstrap patch
- * (build-scripts/vscode/workbench.ts), runs `gulp vscode-web-min`, and publishes
- * the result to <cache>/vscode-web/, the single consumable bundle that
- * build.mjs and fetch-vscode-web.mjs read and version-check.
+ * microsoft/vscode at that tag, runs upstream's own web build tasks on the
+ * unpatched clone, and publishes the result to <cache>/vscode-web/, the single
+ * consumable bundle that build.mjs and fetch-vscode-web.mjs read and version-check.
  *
  * Layout under the cache dir (default ./.cache):
  *   vscode-build/            build scratch (disposable)
@@ -13,8 +12,8 @@
  *     vscode-web/            gulp's raw output (name forced by upstream)
  *   vscode-web/              published consumable bundle  <-- readers use this
  *
- * Script requirements: Node 22+ and yarn (classic), git, a C/C++ toolchain
- * + native headers for VS Code's node-gyp deps
+ * Script requirements: the Node in upstream's .nvmrc or newer, npm, git, a
+ * C/C++ toolchain + native headers for VS Code's node-gyp deps
  *
  * Configuration precedence: CLI flag > env var > config file.
  *
@@ -106,19 +105,6 @@ function cloneVscode(vscodeVersion, scratchDir, cloneDir) {
   ], scratchDir);
 }
 
-/** Copy the vendored bootstrap patch over the upstream workbench entrypoint. */
-function applyWorkbenchPatch(vscodeVersion, cloneDir) {
-  const target = path.join(cloneDir, 'src', 'vs', 'code', 'browser', 'workbench', 'workbench.ts');
-  if (!fs.existsSync(target)) {
-    throw new Error(
-      `upstream moved the workbench entrypoint, patch may need rebasing ` +
-      `against vscodeVersion=${vscodeVersion}\n` +
-      `  expected: ${path.relative(cloneDir, target)}`
-    );
-  }
-  fs.copyFileSync(path.join(root, 'build-scripts', 'vscode', 'workbench.ts'), target);
-}
-
 /**
  * Publish gulp's freshly built bundle to the consumable location.
  *
@@ -158,12 +144,13 @@ function main(cliOpts = {}) {
   fs.mkdirSync(scratchDir, { recursive: true });
 
   cloneVscode(vscodeVersion, scratchDir, cloneDir);
-  run('yarn', ['install', '--frozen-lockfile'], cloneDir, {
+  run('npm', ['ci'], cloneDir, {
     ELECTRON_SKIP_BINARY_DOWNLOAD: '1',
     PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1',
   });
-  applyWorkbenchPatch(vscodeVersion, cloneDir);
-  run('yarn', ['gulp', 'vscode-web-min'], cloneDir);
+  // Not `vscode-web-min` in one go: its mangler needs more memory than a 16 GB machine has.
+  run('npm', ['run', 'gulp', 'compile-build-without-mangling'], cloneDir);
+  run('npm', ['run', 'gulp', 'vscode-web-min-ci'], cloneDir);
   collectOutput(vscodeVersion, scratchDir, outputDir);
 
   console.log(`\nDone. VS Code web bundle published to ${outputDir}`);

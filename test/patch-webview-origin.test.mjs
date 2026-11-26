@@ -14,7 +14,7 @@ const sha256 = (s) => 'sha256-' + createHash('sha256').update(s, 'utf8').digest(
 // plus an inline <script> that contains the origin guard we patch. The declared
 // hash starts deliberately WRONG so the test proves the patch re-syncs it.
 //  - `leadEmpty` prepends the empty `<script></script>` Firefox workaround that
-//    really precedes the module script in index-no-csp.html.
+//    upstream has put before the module script.
 //  - `selfFirst` puts `'self'` before the hash, exercising source ordering.
 //  - `crlf` joins with CRLF, exercising the browser's LF-normalization for hashing.
 function fixtureWithCsp({ leadEmpty = false, selfFirst = false, crlf = false } = {}) {
@@ -43,13 +43,13 @@ describe('patchWebviewOriginCheck', () => {
 		expect(out).toContain("hostname === parentOriginHash || hostname.startsWith(parentOriginHash + '.')");
 	});
 
-	it('is idempotent — patching twice changes nothing further', () => {
+	it('is idempotent, patching twice changes nothing further', () => {
 		const once = patchWebviewOriginCheck(`${GUARD}\n`);
 		const twice = patchWebviewOriginCheck(once);
 		expect(twice).toBe(once);
 	});
 
-	it('throws if the guard anchor is absent (upstream moved — rebase the patch)', () => {
+	it('throws if the guard anchor is absent (upstream moved, rebase the patch)', () => {
 		expect(() => patchWebviewOriginCheck('no guard here')).toThrow(/anchor not found/i);
 	});
 
@@ -114,7 +114,7 @@ describe('patchWebviewOriginCheck', () => {
 		expect(out.split('parentOrigin === location.origin').length - 1).toBe(2);
 	});
 
-	it('does not invent a CSP for docs that have none (index-no-csp variant)', () => {
+	it('does not invent a CSP for docs that have none', () => {
 		const noCsp = `<script></script>\n<script async type="module">\n${GUARD}\n</script>`;
 		const out = patchWebviewOriginCheck(noCsp);
 		expect(out).toContain('parentOrigin === location.origin ||');

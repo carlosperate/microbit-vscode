@@ -30,7 +30,7 @@ This project is licensed under the MIT License. See the [LICENSE](./LICENSE) fil
 This project wouldn't be possible without the following open source projects:
 
 - [Microsoft VS Code](https://github.com/microsoft/vscode): The underlying editor (MIT).
-- [Felx-B/vscode-web](https://github.com/Felx-B/vscode-web): The bootstrap patch this VS Code build adapts (MIT).
+- [Felx-B/vscode-web](https://github.com/Felx-B/vscode-web): The static-site setup this build started from (MIT).
 - [Open VSX](https://open-vsx.org/): The VS Code extension marketplace this build uses.
 - The following VS Code extensions included in the build:
   [VS Code micro:bit Manager](https://github.com/carlosperate/vscode-microbit-manager),
