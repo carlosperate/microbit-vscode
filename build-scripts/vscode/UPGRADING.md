@@ -44,6 +44,7 @@ follow.
 | The source build | `build-vscode.mjs`, `Dockerfile` | `.nvmrc`, `build/npm/preinstall.*`, `build/gulpfile.vscode.web.*`, `build/gulpfile.compile.*` |
 | The page that starts VS Code | `public/index.html` | `src/vs/code/browser/workbench/workbench.html`, `src/vs/workbench/workbench.web.main.internal.ts`, `src/vs/workbench/browser/web.api.ts` |
 | Webviews served from our own origin | `build.mjs` → `patchVscodeBundle()`, `patch-webview-origin.mjs` | `src/vs/workbench/contrib/webview/browser/pre/index.html` |
+| Webviews in Firefox, which leaves a frame mounted blank uncontrolled by the webview service worker | `public/index.html` → `remountBlankWebviews` re-inserts it | `src/vs/workbench/contrib/webview/browser/webviewElement.ts` (`mountTo`, `_initElement`, and messages matched by `target` and origin rather than window). In Firefox, the welcome page must render after a reload and after its tab is shown again |
 | Dead sourcemap links | `build.mjs` → `patchVscodeBundle()`, `strip-sourcemap-urls.mjs` | the last line of any file under `out/` |
 | Pinning activity bar icons | `public/index.html` → `setPinned`, checked in `test/vscode-bundle.test.mjs` | `src/vs/workbench/services/storage/browser/storageService.ts`, `src/vs/workbench/browser/parts/activitybar/activitybarPart.ts` |
 | The seeded layout | `build-scripts/layout-profile.mjs` | the storage keys it writes, checked by eye in a fresh profile |

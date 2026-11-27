@@ -214,6 +214,7 @@
 			// our product.json carries no `commit`, so it substitutes a stale
 			// hardcoded Insiders hash that Microsoft's CDN no longer serves (504).
 			opts.webviewEndpoint = `${BASE}/vscode/out/vs/workbench/contrib/webview/browser/pre`;
+			if (navigator.userAgent.includes('Firefox')) remountBlankWebviews(opts.webviewEndpoint);
 
 			opts.commands = [
 				{
@@ -258,6 +259,17 @@
 			];
 			create(document.body, opts);
 		})().catch(startupFailed);
+
+		// VS Code mounts a webview frame blank and gives it its src afterwards. Firefox then never lets the
+		// running service worker control it, and the webview stays blank. A re-inserted frame loads directly.
+		function remountBlankWebviews(endpoint) {
+			new MutationObserver((records) => {
+				for (const { target: frame } of records) {
+					if (!(frame instanceof HTMLIFrameElement) || !frame.isConnected || !frame.src.startsWith(`${endpoint}/`)) continue;
+					if (frame.contentWindow?.location.href === 'about:blank') frame.parentNode.insertBefore(frame, frame.nextSibling);
+				}
+			}).observe(document, { subtree: true, attributes: true, attributeFilter: ['src'] });
+		}
 
 		// Without this a failed start is a blank page, with the reason only in the console.
 		function startupFailed(error) {
