@@ -35,7 +35,7 @@ What this repo depends on inside VS Code, and what to check when `vscodeVersion`
 **A bundled extension must not ask for a newer VS Code than this one.** VS Code skips any
 extension whose `engines.vscode` is above its own version, built in or not. Extensions with an
 older floor load fine, so the IDE moves first and the pins in `config/extensions.config.json`
-follow.
+follow. `npm run build` fails on such an Open VSX pin.
 
 ## What depends on VS Code
 
@@ -47,7 +47,7 @@ follow.
 | Webviews in Firefox, which leaves a frame mounted blank uncontrolled by the webview service worker | `public/index.html` → `remountBlankWebviews` re-inserts it | `src/vs/workbench/contrib/webview/browser/webviewElement.ts` (`mountTo`, `_initElement`, and messages matched by `target` and origin rather than window). In Firefox, the welcome page must render after a reload and after its tab is shown again |
 | Dead sourcemap links | `build.mjs` → `patchVscodeBundle()`, `strip-sourcemap-urls.mjs` | the last line of any file under `out/` |
 | Pinning activity bar icons | `public/index.html` → `setPinned`, checked in `test/vscode-bundle.test.mjs` | `src/vs/workbench/services/storage/browser/storageService.ts`, `src/vs/workbench/browser/parts/activitybar/activitybarPart.ts` |
-| The seeded layout | `build-scripts/layout-profile.mjs` | the storage keys it writes, checked by eye in a fresh profile |
+| The seeded layout | `build-scripts/layout-profile.mjs`, its ids checked in `test/vscode-bundle.test.mjs` | `workbench.explorer.views.state.hidden`, which VS Code builds at runtime: check the Explorer's views in a fresh profile |
 | Search in the project, and the folder's `[Temporary]` tag | `workspace-storage`, through three proposed APIs it types by hand (`src/vscode-search.d.ts`, `src/vscode-labels.d.ts`) | `src/vscode-dts/vscode.proposed.fileSearchProvider.d.ts`, `…textSearchProvider.d.ts` and `…resolvers.d.ts` (`workspaceSuffix`). A proposal can change in any release, and upstream already has a `…2` of both search ones |
 
 ## The source build

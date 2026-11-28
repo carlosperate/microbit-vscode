@@ -6,6 +6,7 @@ import { Readable } from 'node:stream';
 import { finished } from 'node:stream/promises';
 import semver from 'semver';
 import yauzl from 'yauzl';
+import { loadConfig } from './fetch-vscode-web.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configPath = path.join(root, 'config', 'extensions.config.json');
@@ -198,7 +199,7 @@ async function downloadVsix(publisher, name, version, destPath) {
 	await finished(Readable.fromWeb(res.body).pipe(createWriteStream(destPath)));
 }
 
-export async function fetchAndUnpackExtensions() {
+export async function fetchAndUnpackExtensions(vscodeVersion = loadConfig().vscodeVersion) {
 	const config = loadExtensionsConfig();
 	await mkdir(cacheDir, { recursive: true });
 	await mkdir(distExtensions, { recursive: true });
@@ -220,6 +221,9 @@ export async function fetchAndUnpackExtensions() {
 		await unpackVsix(vsixPath, outDir);
 
 		const pkg = JSON.parse(await readFile(path.join(outDir, 'package.json'), 'utf8'));
+		if (!semver.satisfies(vscodeVersion, pkg.engines.vscode)) {
+			throw new Error(`${id}@${version} needs VS Code ${pkg.engines.vscode}: VS Code Web ${vscodeVersion} would skip it.`);
+		}
 		if (pkg.main && !pkg.browser) {
 			console.warn(
 				`\t⚠️  ${id} has a "main" entry with no "browser" one, likely won't run in vscode-web`

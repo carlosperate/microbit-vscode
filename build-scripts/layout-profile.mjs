@@ -8,7 +8,7 @@ const PROFILE_NAME = 'Default';
 
 const ACTIVITY_BAR_KEY = 'workbench.activity.pinnedViewlets2';
 const EXPLORER_VIEWS_KEY = 'workbench.explorer.views.state.hidden';
-const ACCOUNTS_KEY = 'workbench.activity.showAccounts';
+export const ACCOUNTS_KEY = 'workbench.activity.showAccounts';
 
 export function profileFromLayout(layout) {
 	const storage = {};

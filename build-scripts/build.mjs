@@ -161,7 +161,7 @@ async function main() {
 	const local = await buildLocalExtensions();
 
 	console.log('Fetching Open VSX extensions:');
-	const openvsxExtensionRefs = await fetchAndUnpackExtensions();
+	const openvsxExtensionRefs = await fetchAndUnpackExtensions(vscodeWeb.version);
 
 	await writeProductJson(vscodeWeb.version, [...local.refs, ...openvsxExtensionRefs], local.proposals);
 

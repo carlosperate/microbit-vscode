@@ -6,11 +6,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bundleVersion, loadConfig } from '../build-scripts/fetch-vscode-web.mjs';
 import { localExtensions } from '../build-scripts/build-local-extensions.mjs';
+import { ACCOUNTS_KEY } from '../build-scripts/layout-profile.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bundle = path.join(root, '.cache', 'vscode-web');
 const found = bundleVersion(bundle);
 const page = readFileSync(path.join(root, 'public', 'index.html'), 'utf8');
+const layout = JSON.parse(readFileSync(path.join(root, 'config', 'layout.config.json'), 'utf8'));
 
 let cached;
 const workbench = () => (cached ??= readFileSync(path.join(bundle, 'out', 'vs', 'workbench', 'workbench.web.main.internal.js'), 'utf8'));
@@ -45,6 +47,14 @@ describe.skipIf(found === null && !process.env.CI)('the VS Code bundle in .cache
 
 	it('still syncs storage between windows as { changed, deleted }', () => {
 		expect(/\{changed:[\w$.]+,deleted:[\w$.]+\}/.test(workbench())).toBe(true);
+	});
+
+	// VS Code ignores an unknown id in the seed, so a renamed view would just reappear.
+	const seededIds = [...layout.activityBar, ...layout.explorerViews]
+		.map((view) => view.id)
+		.filter((id) => !id.startsWith('workbench.view.extension.') && !id.startsWith('microbitIde.'));
+	it.each([...seededIds, ACCOUNTS_KEY])('still has %s, which the layout seed names', (id) => {
+		expect(has(`"${id}"`)).toBe(true);
 	});
 
 	// The local extensions type these by hand, and a proposal gains a version when its shape breaks.
