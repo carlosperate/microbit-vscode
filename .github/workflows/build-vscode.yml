@@ -8,7 +8,7 @@ jobs:
   build:
     name: Build and release vscode-web
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:
